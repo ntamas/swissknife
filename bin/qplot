@@ -6,7 +6,7 @@ Plots columns from a data file using Matplotlib.
 """
 
 from swissknife.error import AppError
-from swissknife.utils import open_anything, parse_index_specification
+from swissknife.utils import lenient_float, open_anything, parse_index_specification
 
 from itertools import cycle, islice, izip
 from matplotlib import pyplot as plt
@@ -34,14 +34,6 @@ def create_option_parser():
 			     "be the X coordinate, the rest are Y coordinates of "
 				 "the points.")
     return parser
-
-def lenient_float(value, default=None):
-	"""Like Python's ``float`` but returns the default value when
-	the value cannot be converted to a float."""
-	try:
-		return float(value)
-	except ValueError:
-		return default
 
 def plot_file(infile, options):
     """Plots the dataset in the given file."""
@@ -109,5 +101,4 @@ if __name__ == "__main__":
         sys.exit(main())
     except Exception as ex:
         print >>sys.stderr, ex
-        raise
         sys.exit(1)

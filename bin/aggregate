@@ -1,0 +1,134 @@
+#!/usr/bin/env python
+"""\
+Usage: %prog [options] function infile1 infile2 ...
+
+Aggregates data from multiple data files in tabular format and calculates
+means/sums/variances.
+
+More precisely, the script needs N input files that are in exactly the same
+tabular format, and prints an aggregated file where the jth element in row i
+contains the mean/sum/variance/etc of all the N elements in row i/column j
+in the N input files.
+"""
+
+from __future__ import print_function
+
+from swissknife.error import AppError
+from swissknife.utils import lenient_float, mean, mean_sd, median, \
+        open_anything, parse_index_specification
+
+from itertools import cycle, islice, izip
+import optparse
+import sys
+
+def create_option_parser():
+    """Creates an `OptionParser` that parses the command line
+    options."""
+
+    def function_callback(option, opt_str, value, parser):
+        functions = dict(max=max, mean=mean, mean_sd=mean_sd, median=median,
+                min=min, sum=sum)
+        setattr(parser.values, option.dest, functions[value])
+
+    def indexspec_callback(option, opt_str, value, parser):
+        setattr(parser.values, option.dest,
+                parse_index_specification(value))
+
+    parser = optparse.OptionParser(usage=
+            sys.modules[__name__].__doc__.strip())
+    parser.add_option("-d", "--delimiter", metavar="DELIM",
+            dest="in_delimiter", default="\t",
+            help="use DELIM instad of TAB for field delimiter "
+                 "in the input file")
+    parser.add_option("-D", "--output-delimiter", metavar="DELIM",
+            dest="out_delimiter", default="\t",
+            help="use DELIM instead of TAB for field delimiter "
+                 "in the output file")
+    parser.add_option("-f", "--fields", metavar="LIST",
+            dest="fields", default=[], action="callback",
+            type="str", callback=indexspec_callback,
+            help="use only these columns from the input. The remaining "
+                 "columns will not be printed.")
+    parser.add_option("-F", "--function", metavar="FUNCTION",
+            dest="function", default=mean, action="callback",
+            type="str", callback=function_callback,
+            help="use the given FUNCTION to aggregate the values. "
+                 "Possible values are: mean, median, sum, min, max, mean_sd.")
+    return parser
+
+def only_numbers(iterable):
+    """Returns whether the given iterable contains numbers (or strings that
+    can be converted into numbers) only."""
+    return not any(lenient_float(item) is None for item in iterable)
+
+def process_files(infiles, options):
+    """Processes the given files."""
+    # Calculate the column indices we are interested in
+    if options.fields:
+        col_idxs = [f-1 for f in options.fields]
+    else:
+        col_idxs = None
+
+    # Some caching to avoid costly lookups
+    fields = options.fields
+    func = options.function
+    join = options.out_delimiter.join
+
+    # Flag to denote whether we have seen at least one row with numbers.
+    # If not, we are still processing the headers.
+    data_started = False
+
+    for lines in izip(*[open(f) for f in infiles]):
+        # Split the input line
+        lines = [line.strip().split(options.in_delimiter) for line in lines]
+
+        # Select the relevant columns only
+        if fields:
+            lines = [sublist(line, fields) for line in lines]
+
+        if not data_started:
+            # Check whether this row contains numbers only (at least in the
+            # columns we are interested in)
+            if any(not only_numbers(line) for line in lines):
+                # This is a header, print it from the first file, assuming
+                # that the remaining files contain the same header
+                print(join(lines[0]))
+                continue
+            else: 
+                # Yay, finally real data!
+                data_started = True
+
+        # Convert the columns of interest to floats
+        lines = [[float(x) for x in line] for line in lines]
+
+        # Print the output
+        row = []
+        for items in zip(*lines):
+            result = func(items)
+            if hasattr(result, "__iter__"):
+                row.extend(str(item) for item in result)
+            else:
+                row.append(str(result))
+        print(join(row))
+
+
+def main():
+    """Main entry point of the script."""
+    parser = create_option_parser()
+    options, args = parser.parse_args()
+
+    if options.fields:
+        options.fields = list(options.fields)
+
+    if not args:
+        parser.error("At least one input file must be given")
+
+    process_files(args, options)
+
+if __name__ == "__main__":
+    try:
+        sys.exit(main())
+    except Exception as ex:
+        print(ex, file=sys.stderr)
+        raise
+        sys.exit(1)

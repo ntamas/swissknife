@@ -17,7 +17,7 @@ params["version"] = "1.0"
 params["description"] = "A collection of handy utilities for data crunching"
 
 params["packages"] = find_packages(exclude='tests')
-params["scripts"] = ["bin/remap", "bin/qplot"]
+params["scripts"] = ["bin/aggregate", "bin/remap", "bin/qplot"]
 
 setup(**params)
 

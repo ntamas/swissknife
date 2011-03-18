@@ -27,6 +27,17 @@ public.
 Script index
 ============
 
+``aggregate``
+    Suppose that you are running some randomized simulation of a dynamic
+    process on your computer and log the state of some variables at each
+    time step *t*. You are generally interested in the average behaviour
+    of the system at each time step *t*, therefore you run the simulation
+    1000 times and save the results to 1000 different files. ``aggregate``
+    helps you get the average behaviour in an 1001th data file by
+    taking the mean of values in row *i* and column *j* across each of your
+    1000 files. It is also capable of recognizing headers in the input
+    files; these will be printed intact to the output file.
+
 ``remap``
     Script that can be used to remap columns of entries in a text file
     based on an external mapping file that maps old entry values to new
@@ -41,4 +52,4 @@ Bugs, questions?
 
 Have you found a bug in the code? Do you have questions? Let me know.
 I think you are smart enough to figure out my email address by Googling
-for my name.
+for my name. Or just drop me a message on Github.

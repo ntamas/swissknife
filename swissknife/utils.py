@@ -1,3 +1,53 @@
+
+from __future__ import division
+
+def lenient_float(value, default=None):
+    """Like Python's ``float`` but returns the default value when
+    the value cannot be converted to a float."""
+    try:
+        return float(value)
+    except ValueError:
+        return default
+
+def mean(items):
+    """Returns the mean of the given items.
+    
+    Example::
+        
+        >>> mean([5, 3, 7, 1, 9])
+        5.0
+    """
+    if not items:
+        return 0.0
+    return sum(items) / len(items)
+
+def mean_sd(items):
+    """Returns the mean and the standard deviation of the given items.
+    
+    Example::
+        
+        >>> m, sd = mean_sd([5, 3, 7, 1, 9])
+        >>> abs(sd - 3.162278) < 1e-5
+        True
+    """
+    m = mean(items)
+    sqdiff = sum((item-m) ** 2 for item in items)
+    return m, (sqdiff / (len(items)-1)) ** 0.5
+
+def median(items):
+    """If `items` has an even length, returns the average of the two
+    middle elements. If `items` has an odd length, returns the single
+    middle element. If `items` is empty, returns ``None``.
+    """
+    n = len(items)
+    if not n:
+        return None
+    mid = n // 2
+    items = sorted(items)
+    if n % 2 == 0:
+        return (items[mid-1] + items[mid]) / 2
+    return float(items[mid])
+
 def open_anything(fname, *args, **kwds):
     """Opens the given file. The file may be given as a file object
     or a filename. If the filename ends in ``.bz2`` or ``.gz``, it will
