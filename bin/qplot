@@ -1,0 +1,113 @@
+#!/usr/bin/env python
+"""\
+Usage: %prog [options] [infile]
+
+Plots columns from a data file using Matplotlib.
+"""
+
+from swissknife.error import AppError
+from swissknife.utils import open_anything, parse_index_specification
+
+from itertools import cycle, islice, izip
+from matplotlib import pyplot as plt
+import optparse
+import sys
+
+def create_option_parser():
+    """Creates an `OptionParser` that parses the command line
+    options."""
+
+    def indexspec_callback(option, opt_str, value, parser):
+        setattr(parser.values, option.dest,
+                parse_index_specification(value))
+
+    parser = optparse.OptionParser(usage=
+            sys.modules[__name__].__doc__.strip())
+    parser.add_option("-d", "--delimiter", metavar="DELIM",
+            dest="delimiter", default="\t",
+            help="use DELIM instad of TAB for field delimiter "
+                 "in the input file")
+    parser.add_option("-f", "--fields", metavar="LIST",
+            dest="fields", default=[], action="callback",
+            type="str", callback=indexspec_callback,
+            help="plot only these columns. The first index must always "
+			     "be the X coordinate, the rest are Y coordinates of "
+				 "the points.")
+    return parser
+
+def lenient_float(value, default=None):
+	"""Like Python's ``float`` but returns the default value when
+	the value cannot be converted to a float."""
+	try:
+		return float(value)
+	except ValueError:
+		return default
+
+def plot_file(infile, options):
+    """Plots the dataset in the given file."""
+    xs = []
+    yss = []
+    headers = None
+    for line in open_anything(infile):
+        parts = line.strip().split(options.delimiter)
+
+        if not options.fields:
+            values = [lenient_float(num) for num in parts]
+        else:
+            values = [lenient_float(parts[i-1]) for i in options.fields]
+
+        if not yss:
+            # No data yet, maybe this is the header?
+            if any(value is None for value in values):
+                headers = list(parts)
+                continue
+
+        if len(values) < 2:
+            continue
+
+        xs.append(values[0])
+        if not yss:
+            # First row, must extend yss with columns
+            yss = [[y] for y in islice(values, 1, None)]
+        else:
+            for ys, y in izip(yss, islice(values, 1, None)):
+                ys.append(y)
+
+    args = []
+
+    styles = ['b-', 'g-', 'r-', 'c-', 'm-', 'y-', 'k-']
+    for style, ys in izip(cycle(styles), yss):
+        args.extend([xs, ys, style])
+    plt.plot(*args)
+
+    if yss and headers is not None:
+        if options.fields:
+            idxs = [f-1 for f in options.fields[1:]]
+        else:
+            idxs = range(1, len(yss)+1)
+        legend = [headers[idx] for idx in idxs]
+        plt.legend(legend)
+
+def main():
+    """Main entry point of the script."""
+    parser = create_option_parser()
+    options, args = parser.parse_args()
+
+    if options.fields:
+        options.fields = list(options.fields)
+
+    if not args:
+        args.extend("-")
+
+    for infile in args:
+        plot_file(infile, options)
+
+    plt.show()
+
+if __name__ == "__main__":
+    try:
+        sys.exit(main())
+    except Exception as ex:
+        print >>sys.stderr, ex
+        raise
+        sys.exit(1)
