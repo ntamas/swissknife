@@ -37,6 +37,8 @@ def create_option_parser():
 
 def plot_file(infile, options):
     """Plots the dataset in the given file."""
+    plt.figure()
+
     xs = []
     yss = []
     headers = None
@@ -71,6 +73,7 @@ def plot_file(infile, options):
     for style, ys in izip(cycle(styles), yss):
         args.extend([xs, ys, style])
     plt.plot(*args)
+    plt.title(infile)
 
     if yss and headers is not None:
         if options.fields:
