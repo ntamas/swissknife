@@ -21,6 +21,9 @@ from itertools import cycle, islice, izip
 import optparse
 import sys
 
+# Add metadata for some of the aggregation functions
+mean_sd.argout = ("", "sd")
+
 def create_option_parser():
     """Creates an `OptionParser` that parses the command line
     options."""
@@ -92,7 +95,16 @@ def process_files(infiles, options):
             if any(not only_numbers(line) for line in lines):
                 # This is a header, print it from the first file, assuming
                 # that the remaining files contain the same header
-                print(join(lines[0]))
+                if hasattr(func, "argout"):
+                    headers = []
+                    for header in lines[0]:
+                        headers.extend(
+                                "%s_%s" % (header, arg) if arg else header
+                                for arg in func.argout
+                        )
+                    print(join(headers))
+                else:
+                    print(join(lines[0]))
                 continue
             else: 
                 # Yay, finally real data!

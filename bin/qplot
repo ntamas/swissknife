@@ -32,7 +32,14 @@ def create_option_parser():
             type="str", callback=indexspec_callback,
             help="plot only these columns. The first index must always "
 			     "be the X coordinate, the rest are Y coordinates of "
-				 "the points.")
+				 "the points and possibly the sizes of the error bars "
+                 "(if --errorbars is not none).")
+    parser.add_option("-e", "--errorbars", metavar="AXES",
+            dest="errorbars", choices=("none", "y"), default="none",
+            help="use errorbars on the given AXES. If AXES=none, "
+                 "no error bars will be used. If AXES=y, every second column "
+                 "after the 2nd one (i.e. the 3rd, 5th, 7th etc) is assumed to "
+                 "be an error bar for the value in the previous column.")
     return parser
 
 def plot_file(infile, options):
@@ -56,9 +63,14 @@ def plot_file(infile, options):
                 headers = list(parts)
                 continue
 
+        # Less than two values? If so, skip this line.
         if len(values) < 2:
             continue
 
+        # The first value is the X coordinate. We put the
+        # rest in yss and will separate them later into Y
+        # coordinates and error bars if options.errorbars
+        # is not none
         xs.append(values[0])
         if not yss:
             # First row, must extend yss with columns
@@ -67,20 +79,45 @@ def plot_file(infile, options):
             for ys, y in izip(yss, islice(values, 1, None)):
                 ys.append(y)
 
-    args = []
-
-    styles = ['b-', 'g-', 'r-', 'c-', 'm-', 'y-', 'k-']
-    for style, ys in izip(cycle(styles), yss):
-        args.extend([xs, ys, style])
-    plt.plot(*args)
-    plt.title(infile)
-
+    # Calculate the legend labels
+    legend = []
     if yss and headers is not None:
         if options.fields:
             idxs = [f-1 for f in options.fields[1:]]
         else:
             idxs = range(1, len(yss)+1)
         legend = [headers[idx] for idx in idxs]
+
+    if options.errorbars == "y":
+        # Separate the error bars from the values
+        ncol = len(yss)
+        errorbars = [yss[i] for i in xrange(1, ncol, 2)]
+        yss = [yss[i] for i in xrange(0, ncol, 2)]
+        legend = [legend[i] for i in xrange(0, min(len(legend), ncol), 2)]
+    else:
+        # No error bars
+        errorbars = None
+
+    # Set up the line styles to be used
+    line_styles = ['b-', 'g-', 'r-', 'c-', 'm-', 'y-', 'k-']
+    bar_styles  = ['bo', 'go', 'ro', 'co', 'mo', 'yo', 'ko']
+
+    # Plot the lines
+    args = []
+    for style, ys in izip(cycle(line_styles), yss):
+        args.extend([xs, ys, style])
+    plt.plot(*args)
+
+    # Plot the error bars if needed
+    if errorbars:
+        for style, ys, yerrs in izip(cycle(bar_styles), yss, errorbars):
+            plt.errorbar(xs, ys, yerr=yerrs, fmt=style)
+
+    # Add the title
+    plt.title(infile)
+
+    # Add the legend
+    if legend:
         plt.legend(legend)
 
 def main():
@@ -104,4 +141,6 @@ if __name__ == "__main__":
         sys.exit(main())
     except Exception as ex:
         print >>sys.stderr, ex
+        import traceback
+        traceback.print_exc(ex)
         sys.exit(1)
