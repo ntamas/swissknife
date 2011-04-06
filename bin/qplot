@@ -40,6 +40,9 @@ def create_option_parser():
                  "no error bars will be used. If AXES=y, every second column "
                  "after the 2nd one (i.e. the 3rd, 5th, 7th etc) is assumed to "
                  "be an error bar for the value in the previous column.")
+    parser.add_option("-o", "--output", metavar="FILE", dest="output",
+            default=None, help="save the output to the given FILE")
+
     return parser
 
 def plot_file(infile, options):
@@ -134,7 +137,10 @@ def main():
     for infile in args:
         plot_file(infile, options)
 
-    plt.show()
+    if options.output:
+        plt.savefig(options.output)
+    else:
+        plt.show()
 
 if __name__ == "__main__":
     try:
