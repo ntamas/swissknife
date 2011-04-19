@@ -113,3 +113,6 @@ def parse_index_specification(spec):
             result.append(int(part))
     return result
 
+def sublist(l, idxs):
+    return [l[i] for i in idxs]
+

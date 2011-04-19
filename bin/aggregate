@@ -15,7 +15,7 @@ from __future__ import print_function
 
 from swissknife.error import AppError
 from swissknife.utils import flatten, lenient_float, mean, mean_sd, median, \
-        open_anything, parse_index_specification
+        open_anything, parse_index_specification, sublist
 
 from itertools import cycle, islice, izip
 import optparse
@@ -77,7 +77,7 @@ def process_files_column(infiles, options):
     for the column of the file.
     """
     for idx, filename in enumerate(infiles):
-        process_files_column_single(open(filename), options, idx == 0)
+        process_files_column_single(open_anything(filename), options, idx == 0)
 
 def process_files_column_single(fp, options, first_file=False):
     """Processes the given stream (open file) in ``column`` mode."""
@@ -104,8 +104,8 @@ def process_files_column_single(fp, options, first_file=False):
         line = line.strip().split(delim)
 
         # Select the relevant columns only
-        if fields:
-            line = sublist(line, fields)
+        if col_idxs:
+            line = sublist(line, col_idxs)
 
         if not data_started:
             # Check whether this row contains numbers only (at least in the
@@ -160,13 +160,13 @@ def process_files_multiple(infiles, options):
     # If not, we are still processing the headers.
     data_started = False
 
-    for lines in izip(*[open(f) for f in infiles]):
+    for lines in izip(*[open_anything(f) for f in infiles]):
         # Split the input line
         lines = [line.strip().split(delim) for line in lines]
 
         # Select the relevant columns only
-        if fields:
-            lines = [sublist(line, fields) for line in lines]
+        if col_idxs:
+            lines = [sublist(line, col_idxs) for line in lines]
 
         if not data_started:
             # Check whether this row contains numbers only (at least in the
