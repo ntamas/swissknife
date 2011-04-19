@@ -1,6 +1,31 @@
 
 from __future__ import division
 
+def flatten(*args):
+    """Recursively flattens a list containing other lists or
+    single items into a list.
+    
+    Examples::
+
+        >>> flatten()
+        []
+        >>> flatten(2)
+        [2]
+        >>> flatten(2, 3, 4)
+        [2, 3, 4]
+        >>> flatten([2, 3, 4])
+        [2, 3, 4]
+        >>> flatten([[2, 3], [4, 5], 6, [7, 8]])
+        [2, 3, 4, 5, 6, 7, 8]
+    """
+    if len(args) == 0:
+        return []
+    if len(args) > 1:
+        return flatten(list(args))
+    if hasattr(args[0], "__iter__") and not isinstance(args[0], basestring):
+        return sum(map(flatten, args[0]), [])
+    return list(args)
+
 def lenient_float(value, default=None):
     """Like Python's ``float`` but returns the default value when
     the value cannot be converted to a float."""

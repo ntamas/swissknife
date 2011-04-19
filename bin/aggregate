@@ -14,7 +14,7 @@ in the N input files.
 from __future__ import print_function
 
 from swissknife.error import AppError
-from swissknife.utils import lenient_float, mean, mean_sd, median, \
+from swissknife.utils import flatten, lenient_float, mean, mean_sd, median, \
         open_anything, parse_index_specification
 
 from itertools import cycle, islice, izip
@@ -57,6 +57,11 @@ def create_option_parser():
             type="str", callback=function_callback,
             help="use the given FUNCTION to aggregate the values. "
                  "Possible values are: mean, median, sum, min, max, mean_sd.")
+    parser.add_option("-m", "--mode", metavar="MODE", dest="mode",
+            choices=("column", "multiple"), default="multiple",
+            help="set the aggregation MODE. Possible values are: column "
+                 "or multiple. See the documentation for more details.")
+
     return parser
 
 def only_numbers(iterable):
@@ -64,8 +69,19 @@ def only_numbers(iterable):
     can be converted into numbers) only."""
     return not any(lenient_float(item) is None for item in iterable)
 
-def process_files(infiles, options):
-    """Processes the given files."""
+def process_files_column(infiles, options):
+    """Processes the given files in ``column`` mode.
+    
+    Files will be processed sequentially. The output is a single line for
+    each file where column i contains the result of the aggregation function
+    for the column of the file.
+    """
+    for idx, filename in enumerate(infiles):
+        process_files_column_single(open(filename), options, idx == 0)
+
+def process_files_column_single(fp, options, first_file=False):
+    """Processes the given stream (open file) in ``column`` mode."""
+
     # Calculate the column indices we are interested in
     if options.fields:
         col_idxs = [f-1 for f in options.fields]
@@ -73,6 +89,69 @@ def process_files(infiles, options):
         col_idxs = None
 
     # Some caching to avoid costly lookups
+    delim = options.in_delimiter
+    fields = options.fields
+    func = options.function
+    join = options.out_delimiter.join
+
+    # Flag to denote whether we have seen at least one row with numbers.
+    # If not, we are still processing the headers.
+    data_started = False
+    result = []
+
+    for line in fp:
+        # Split the input line
+        line = line.strip().split(delim)
+
+        # Select the relevant columns only
+        if fields:
+            line = sublist(line, fields)
+
+        if not data_started:
+            # Check whether this row contains numbers only (at least in the
+            # columns we are interested in)
+            if not only_numbers(line):
+                # This is a header, print it if we are in the first file, assuming
+                # that the remaining files contain the same header
+                if first_file:
+                    if hasattr(func, "argout"):
+                        headers = []
+                        for header in line:
+                            headers.extend(
+                                    "%s_%s" % (header, arg) if arg else header
+                                    for arg in func.argout
+                            )
+                    else:
+                        headers = line
+                    print(join(headers))
+                continue
+            else: 
+                # Yay, finally real data!
+                data_started = True
+
+        # Convert the columns of interest to floats
+        line = [float(x) for x in line]
+        if len(result) < len(line):
+            result.extend([[0.0] for _ in xrange(len(line) - len(result))])
+        for item, l in izip(line, result):
+            l.append(item)
+
+    # Print the output
+    print(join(map(str, flatten(func(items) for items in result))))
+
+def process_files_multiple(infiles, options):
+    """Processes the given files in ``multiple`` mode.
+    
+    Files will be processed in parallel; row i of each file will be aggregated
+    using the aggregation function into row i of the output."""
+    # Calculate the column indices we are interested in
+    if options.fields:
+        col_idxs = [f-1 for f in options.fields]
+    else:
+        col_idxs = None
+
+    # Some caching to avoid costly lookups
+    delim = options.in_delimiter
     fields = options.fields
     func = options.function
     join = options.out_delimiter.join
@@ -83,7 +162,7 @@ def process_files(infiles, options):
 
     for lines in izip(*[open(f) for f in infiles]):
         # Split the input line
-        lines = [line.strip().split(options.in_delimiter) for line in lines]
+        lines = [line.strip().split(delim) for line in lines]
 
         # Select the relevant columns only
         if fields:
@@ -135,7 +214,12 @@ def main():
     if not args:
         parser.error("At least one input file must be given")
 
-    process_files(args, options)
+    if options.mode == "multiple":
+        process_files_multiple(args, options)
+    elif options.mode == "column":
+        process_files_column(args, options)
+    else:
+        parser.error("Invalid mode: %s" % options.mode)
 
 if __name__ == "__main__":
     try:
