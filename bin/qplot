@@ -10,6 +10,9 @@ from swissknife.utils import lenient_float, open_anything, parse_index_specifica
 
 from itertools import cycle, islice, izip
 from matplotlib import pyplot as plt
+from numpy import array, isnan, NaN
+from numpy.ma import masked_where
+
 import optparse
 import sys
 
@@ -60,12 +63,13 @@ def plot_file(infile, options):
     yss = []
     headers = None
     for line in open_anything(infile):
-        parts = line.strip().split(options.delimiter)
+        parts = line.strip("\r\n").split(options.delimiter)
 
         if not options.fields:
-            values = [lenient_float(num) for num in parts]
+            values = [lenient_float(num, default=NaN) for num in parts]
         else:
-            values = [lenient_float(parts[i-1]) for i in options.fields]
+            values = [lenient_float(parts[i-1], default=NaN)
+                    for i in options.fields]
 
         if not yss:
             # No data yet, maybe this is the header?
@@ -98,19 +102,30 @@ def plot_file(infile, options):
             idxs = range(1, len(yss)+1)
         legend = [headers[idx] for idx in idxs]
 
+    # Mask NaNs in xs
+    xs = array(xs)
+    xs = masked_where(isnan(xs), xs)
+
+    # Mask NaNs in yss
+    yss = array(yss)
+    yss = masked_where(isnan(yss), yss)
+
+    # Handle error bars
     if options.errorbars == "y":
         # Separate the error bars from the values
         ncol = len(yss)
-        errorbars = [yss[i] for i in xrange(1, ncol, 2)]
-        yss = [yss[i] for i in xrange(0, ncol, 2)]
-        legend = [legend[i] for i in xrange(0, min(len(legend), ncol), 2)]
+        errorbars = yss[1::2]
+        yss = yss[::2]
+        legend = legend[:min(len(legend), ncol):2]
     else:
         # No error bars
         errorbars = None
 
     # Set up the line styles to be used
-    line_styles = ['b-', 'g-', 'r-', 'c-', 'm-', 'y-', 'k-']
-    bar_styles  = ['bo', 'go', 'ro', 'co', 'mo', 'yo', 'ko']
+    colors = 'bgrcmyk'
+    styles = '- -- -. :'.split()
+    line_styles = [color+style for style in styles for color in colors]
+    bar_styles = [color+'o' for style in styles for color in colors]
 
     # Plot the lines
     args = []
@@ -119,7 +134,7 @@ def plot_file(infile, options):
     plt.plot(*args)
 
     # Plot the error bars if needed
-    if errorbars:
+    if errorbars is not None:
         for style, ys, yerrs in izip(cycle(bar_styles), yss, errorbars):
             plt.errorbar(xs, ys, yerr=yerrs, fmt=style)
 
