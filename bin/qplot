@@ -31,8 +31,8 @@ def create_option_parser():
             dest="fields", default=[], action="callback",
             type="str", callback=indexspec_callback,
             help="plot only these columns. The first index must always "
-			     "be the X coordinate, the rest are Y coordinates of "
-				 "the points and possibly the sizes of the error bars "
+                 "be the X coordinate, the rest are Y coordinates of "
+                 "the points and possibly the sizes of the error bars "
                  "(if --errorbars is not none).")
     parser.add_option("-e", "--errorbars", metavar="AXES",
             dest="errorbars", choices=("none", "y"), default="none",
@@ -42,6 +42,13 @@ def create_option_parser():
                  "be an error bar for the value in the previous column.")
     parser.add_option("-o", "--output", metavar="FILE", dest="output",
             default=None, help="save the output to the given FILE")
+    parser.add_option("--title", metavar="TITLE", dest="title",
+            default=None, help="set the title of the plot to TITLE. "
+            "The default title is the input filename.")
+    parser.add_option("--xlabel", metavar="LABEL", dest="xlabel",
+            default="", help="set the label of the X axis to LABEL")
+    parser.add_option("--ylabel", metavar="LABEL", dest="ylabel",
+            default="", help="set the title of the Y axis to LABEL")
 
     return parser
 
@@ -117,7 +124,16 @@ def plot_file(infile, options):
             plt.errorbar(xs, ys, yerr=yerrs, fmt=style)
 
     # Add the title
-    plt.title(infile)
+    if options.title is None:
+        plt.title(infile)
+    else:
+        plt.title(options.title)
+
+    # Add the axis titles
+    if options.xlabel:
+        plt.xlabel(options.xlabel)
+    if options.ylabel:
+        plt.ylabel(options.ylabel)
 
     # Add the legend
     if legend:
