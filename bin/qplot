@@ -48,6 +48,8 @@ def create_option_parser():
     parser.add_option("--title", metavar="TITLE", dest="title",
             default=None, help="set the title of the plot to TITLE. "
             "The default title is the input filename.")
+    parser.add_option("--twin", dest="twin", default=False,
+            action="store_true", help="use two Y axes")
     parser.add_option("--xlabel", metavar="LABEL", dest="xlabel",
             default="", help="set the label of the X axis to LABEL")
     parser.add_option("--ylabel", metavar="LABEL", dest="ylabel",
@@ -80,6 +82,10 @@ def plot_file(infile, options):
         if len(values) < 2:
             continue
 
+        # Not enough columns? Add the missing ones.
+        if len(values) < len(yss)+1:
+            values.extend([None] * (len(yss)+1-len(values)))
+
         # The first value is the X coordinate. We put the
         # rest in yss and will separate them later into Y
         # coordinates and error bars if options.errorbars
@@ -93,13 +99,13 @@ def plot_file(infile, options):
                 ys.append(y)
 
     # Calculate the legend labels
-    legend = []
+    legend_handles, legend_labels = [], []
     if yss and headers is not None:
         if options.fields:
             idxs = [f-1 for f in options.fields[1:]]
         else:
             idxs = range(1, len(yss)+1)
-        legend = [headers[idx] for idx in idxs]
+        legend_labels = [headers[idx] for idx in idxs]
 
     # Mask NaNs in xs
     xs = [x if x is not None else NaN for x in xs]
@@ -117,7 +123,7 @@ def plot_file(infile, options):
         ncol = len(yss)
         errorbars = yss[1::2]
         yss = yss[::2]
-        legend = legend[:min(len(legend), ncol):2]
+        legend_labels = legend_labels[:min(len(legend_labels), ncol):2]
     else:
         # No error bars
         errorbars = None
@@ -128,16 +134,27 @@ def plot_file(infile, options):
     line_styles = [color+style for style in styles for color in colors]
     bar_styles = [color+'o' for style in styles for color in colors]
 
+    # Set up the list of axes we will use
+    all_axes = [plt.gca()]
+    if options.twin:
+        all_axes.append(plt.gca().twinx())
+
     # Plot the lines
-    args = []
-    for style, ys in izip(cycle(line_styles), yss):
-        args.extend([xs, ys, style])
-    plt.plot(*args)
+    for axes, style, ys in izip(cycle(all_axes), cycle(line_styles), yss):
+        handle = axes.plot(xs, ys, style)
+        legend_handles.append(handle)
 
     # Plot the error bars if needed
     if errorbars is not None:
-        for style, ys, yerrs in izip(cycle(bar_styles), yss, errorbars):
-            plt.errorbar(xs, ys, yerr=yerrs, fmt=style)
+        for axes, style, ys, yerrs in izip(cycle(all_axes), \
+                cycle(bar_styles), yss, errorbars):
+            axes.errorbar(xs, ys, yerr=yerrs, fmt=style)
+
+    # Add the axis titles
+    if options.xlabel:
+        all_axes[0].set_xlabel(options.xlabel)
+    if options.ylabel:
+        all_axes[0].set_ylabel(options.ylabel)
 
     # Add the title
     if options.title is None:
@@ -145,15 +162,9 @@ def plot_file(infile, options):
     else:
         plt.title(options.title)
 
-    # Add the axis titles
-    if options.xlabel:
-        plt.xlabel(options.xlabel)
-    if options.ylabel:
-        plt.ylabel(options.ylabel)
-
     # Add the legend
-    if legend:
-        legend_obj = plt.legend(legend)
+    if legend_labels:
+        legend_obj = plt.legend(legend_handles, legend_labels)
         legend_obj.legendPatch.set_alpha(0.75)
 
 def main():

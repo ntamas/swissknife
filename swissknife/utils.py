@@ -1,6 +1,11 @@
 
 from __future__ import division
 
+def first(iterable):
+    """Returns the first element of the iterable."""
+    for item in iterable:
+        return item
+
 def flatten(*args):
     """Recursively flattens a list containing other lists or
     single items into a list.
@@ -25,6 +30,12 @@ def flatten(*args):
     if hasattr(args[0], "__iter__") and not isinstance(args[0], basestring):
         return sum(map(flatten, args[0]), [])
     return list(args)
+
+def last(iterable):
+    """Returns the last element of the iterable."""
+    for item in iterable:
+        result = item
+    return result
 
 def lenient_float(value, default=None):
     """Like Python's ``float`` but returns the default value when

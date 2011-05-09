@@ -14,8 +14,8 @@ in the N input files.
 from __future__ import print_function
 
 from swissknife.error import AppError
-from swissknife.utils import flatten, lenient_float, mean, mean_sd, median, \
-        open_anything, parse_index_specification, sublist
+from swissknife.utils import first, flatten, last, lenient_float, mean, \
+        mean_sd, median, open_anything, parse_index_specification, sublist
 
 from itertools import cycle, islice, izip
 import optparse
@@ -30,7 +30,7 @@ def create_option_parser():
 
     def function_callback(option, opt_str, value, parser):
         functions = dict(max=max, mean=mean, mean_sd=mean_sd, median=median,
-                min=min, sum=sum)
+                min=min, sum=sum, first=first, last=last)
         setattr(parser.values, option.dest, functions[value])
 
     def indexspec_callback(option, opt_str, value, parser):
