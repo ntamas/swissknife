@@ -84,6 +84,11 @@ def median(items):
         return (items[mid-1] + items[mid]) / 2
     return float(items[mid])
 
+def only_numbers(iterable):
+    """Returns whether the given iterable contains numbers (or strings that
+    can be converted into numbers) only."""
+    return not any(lenient_float(item) is None for item in iterable)
+
 def open_anything(fname, *args, **kwds):
     """Opens the given file. The file may be given as a file object
     or a filename. If the filename ends in ``.bz2`` or ``.gz``, it will

@@ -72,7 +72,7 @@ def plot_file(infile, options):
         else:
             values = [lenient_float(parts[i-1]) for i in options.fields]
 
-        if not yss:
+        if not yss and not headers:
             # No data yet, maybe this is the header?
             if any(value is None for value in values):
                 headers = list(parts)

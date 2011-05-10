@@ -15,7 +15,8 @@ from __future__ import print_function
 
 from swissknife.error import AppError
 from swissknife.utils import first, flatten, last, lenient_float, mean, \
-        mean_sd, median, open_anything, parse_index_specification, sublist
+        mean_sd, median, only_numbers, open_anything, \
+        parse_index_specification, sublist
 
 from itertools import cycle, islice, izip
 import optparse
@@ -63,11 +64,6 @@ def create_option_parser():
                  "or multiple. See the documentation for more details.")
 
     return parser
-
-def only_numbers(iterable):
-    """Returns whether the given iterable contains numbers (or strings that
-    can be converted into numbers) only."""
-    return not any(lenient_float(item) is None for item in iterable)
 
 def process_files_column(infiles, options):
     """Processes the given files in ``column`` mode.
