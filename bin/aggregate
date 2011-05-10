@@ -132,7 +132,11 @@ def process_files_column_single(fp, options, first_file=False):
         # Convert the columns of interest to floats
         line = [float(x) for x in line]
         if len(result) < len(line):
-            result.extend([[0.0] for _ in xrange(len(line) - len(result))])
+            diff = len(line) - len(result)
+            if not result:
+                result = [[] for _ in xrange(diff)]
+            else:
+                result.extend([0.0] for _ in xrange(diff))
         for item, l in izip(line, result):
             l.append(item)
 
