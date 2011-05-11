@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+# vim:set ts=4 sw=4 sts=4 et:
 """\
 Usage: %prog [options] [infile]
 
@@ -6,10 +7,10 @@ Plots columns from a data file using Matplotlib.
 """
 
 from swissknife.error import AppError
-from swissknife.utils import lenient_float, open_anything, parse_index_specification
+from swissknife.utils import lenient_float, open_anything, parse_index_specification, \
+        TableWithHeaderIterator
 
 from itertools import cycle, islice, izip
-from matplotlib import pyplot as plt
 from numpy import array, isnan, NaN
 from numpy.ma import masked_where
 
@@ -33,10 +34,12 @@ def create_option_parser():
     parser.add_option("-f", "--fields", metavar="LIST",
             dest="fields", default=[], action="callback",
             type="str", callback=indexspec_callback,
-            help="plot only these columns. The first index must always "
-                 "be the X coordinate, the rest are Y coordinates of "
-                 "the points and possibly the sizes of the error bars "
-                 "(if --errorbars is not none).")
+            help="plot only these columns. For line plots (see -t), the "
+                 "first index must always be the X coordinate, the rest "
+                 "are Y coordinates of the points and possibly the sizes "
+                 "of the error bars (if --errorbars is not none). For "
+                 "3D plots, you need exactly three columns with the "
+                 "X, Y and Z coordinates.")
     parser.add_option("-e", "--errorbars", metavar="AXES",
             dest="errorbars", choices=("none", "y"), default="none",
             help="use errorbars on the given AXES. If AXES=none, "
@@ -45,6 +48,9 @@ def create_option_parser():
                  "be an error bar for the value in the previous column.")
     parser.add_option("-o", "--output", metavar="FILE", dest="output",
             default=None, help="save the output to the given FILE")
+    parser.add_option("-t", "--type", metavar="TYPE", dest="type",
+            choices=("line", "scatter3d"), default="line",
+            help="the type of plot to draw (line or scatter3d)")
     parser.add_option("--title", metavar="TITLE", dest="title",
             default=None, help="set the title of the plot to TITLE. "
             "The default title is the input filename.")
@@ -54,30 +60,33 @@ def create_option_parser():
             default="", help="set the label of the X axis to LABEL")
     parser.add_option("--ylabel", metavar="LABEL", dest="ylabel",
             default="", help="set the title of the Y axis to LABEL")
+    parser.add_option("--zlabel", metavar="LABEL", dest="zlabel",
+            default="", help="set the title of the Z axis to LABEL (3D plots only)")
 
     return parser
 
-def plot_file(infile, options):
-    """Plots the dataset in the given file."""
-    plt.figure()
+def plot_file_on_figure(infile, figure, options):
+    """Plots the dataset in the given file on the given figure."""
+    iterator = TableWithHeaderIterator(
+            open_anything(infile),
+            delimiter=options.delimiter,
+            fields=options.fields
+    )
+    func = globals()["plot_%s_from_table_iterator" % options.type]
+    func(iterator, figure, options)
 
-    xs = []
-    yss = []
-    headers = None
-    for line in open_anything(infile):
-        parts = line.strip("\r\n").split(options.delimiter)
+    # Add the title
+    if options.title is None:
+        figure.suptitle(infile)
+    else:
+        figure.suptitle(options.title)
 
-        if not options.fields:
-            values = [lenient_float(num) for num in parts]
-        else:
-            values = [lenient_float(parts[i-1]) for i in options.fields]
-
-        if not yss and not headers:
-            # No data yet, maybe this is the header?
-            if any(value is None for value in values):
-                headers = list(parts)
-                continue
-
+def plot_line_from_table_iterator(table_iterator, figure, options):
+    """Plots the dataset whose rows will be yielded by the given
+    `table_iterator` (an instance of `TableWithHeaderIterator`).
+    The plot will be drawn on `figure`."""
+    xs, yss = [], []
+    for values in table_iterator:
         # Less than two values? If so, skip this line.
         if len(values) < 2:
             continue
@@ -98,14 +107,12 @@ def plot_file(infile, options):
             for ys, y in izip(yss, islice(values, 1, None)):
                 ys.append(y)
 
+    headers = table_iterator.headers
+
     # Calculate the legend labels
     legend_handles, legend_labels = [], []
     if yss and headers is not None:
-        if options.fields:
-            idxs = [f-1 for f in options.fields[1:]]
-        else:
-            idxs = range(1, len(yss)+1)
-        legend_labels = [headers[idx] for idx in idxs]
+        legend_labels = headers[1:]
 
     # Mask NaNs in xs
     xs = [x if x is not None else NaN for x in xs]
@@ -135,9 +142,9 @@ def plot_file(infile, options):
     bar_styles = [color+'o' for style in styles for color in colors]
 
     # Set up the list of axes we will use
-    all_axes = [plt.gca()]
+    all_axes = [figure.gca()]
     if options.twin:
-        all_axes.append(plt.gca().twinx())
+        all_axes.append(figure.gca().twinx())
 
     # Plot the lines
     for axes, style, ys in izip(cycle(all_axes), cycle(line_styles), yss):
@@ -156,30 +163,70 @@ def plot_file(infile, options):
     if options.ylabel:
         all_axes[0].set_ylabel(options.ylabel)
 
-    # Add the title
-    if options.title is None:
-        plt.title(infile)
-    else:
-        plt.title(options.title)
-
     # Add the legend
     if legend_labels:
-        legend_obj = plt.legend(legend_handles, legend_labels)
+        legend_obj = all_axes[0].legend(legend_handles, legend_labels)
         legend_obj.legendPatch.set_alpha(0.75)
+
+def plot_scatter3d_from_table_iterator(table_iterator, figure, options):
+    """Plots a 3D scatterplot whose points come from the given `table_iterator`.
+    The plot will be drawn on `figure`."""
+    xs, ys, zs = [], [], []
+    for values in table_iterator:
+        # Less than three values? If so, skip this line.
+        if len(values) < 3:
+            continue
+
+        # Any of the values missing? If so, skip this line
+        if any(value is None for value in values):
+            continue
+
+        xs.append(values[0])
+        ys.append(values[1])
+        zs.append(values[2])
+
+    # Import 3D axes
+    from mpl_toolkits.mplot3d import Axes3D
+
+    # Create the axes
+    axes = Axes3D(figure)
+
+    # Plot the surface
+    # xs, ys, zs = array([xs]), array([ys]), array([zs])
+    axes.scatter(xs, ys, zs)
+
+    # Add the axis titles
+    if options.xlabel:
+        axes.set_xlabel(options.xlabel)
+    if options.ylabel:
+        axes.set_ylabel(options.ylabel)
+    if options.zlabel:
+        axes.set_zlabel(options.zlabel)
+
+    return figure
 
 def main():
     """Main entry point of the script."""
+    import matplotlib
+
     parser = create_option_parser()
     options, args = parser.parse_args()
+    
+    # Do we need headless mode for matplotlib?
+    if options.output:
+        matplotlib.use("agg")
 
     if options.fields:
-        options.fields = list(options.fields)
+        options.fields = [field-1 for field in options.fields]
 
     if not args:
         args.extend("-")
 
+    from matplotlib import pyplot as plt
+    figure = plt.figure()
+
     for infile in args:
-        plot_file(infile, options)
+        plot_file_on_figure(infile, figure, options)
 
     if options.output:
         plt.savefig(options.output)

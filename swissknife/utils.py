@@ -31,6 +31,42 @@ def flatten(*args):
         return sum(map(flatten, args[0]), [])
     return list(args)
 
+class TableWithHeaderIterator(object):
+    """Iterates over rows of a stream that contain a table in tabular format,
+    with an optional header."""
+
+    def __init__(self, fp, delimiter=None, fields=None):
+        """Creates an iterator that reads the given stream `fp` and uses
+        the given `delimiter` character. ``None`` means any whitespace
+        character. `fields` specifies which columns to filter on; if it
+        is ``None``, all columns will be considered."""
+        self.delimiter = delimiter
+        self.fields = fields
+        self.fp = fp
+        self.seen_header = False
+        self.headers = None
+
+    def __iter__(self):
+        for line in self.fp:
+            parts = line.strip("\r\n").split(self.delimiter)
+            if not self.fields:
+                values = [lenient_float(num) for num in parts]
+            else:
+                values = [lenient_float(parts[i]) for i in self.fields]
+
+            if not self.seen_header:
+                # No data yet, maybe this is the header?
+                if any(value is None for value in values):
+                    if not self.fields:
+                        self.headers = parts
+                    else:
+                        self.headers = sublist(parts, self.fields)
+                    self.seen_header = True
+                    continue
+
+            yield values
+
+
 def last(iterable):
     """Returns the last element of the iterable."""
     for item in iterable:
