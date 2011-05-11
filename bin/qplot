@@ -192,7 +192,7 @@ def plot_scatter3d_from_table_iterator(table_iterator, figure, options):
     # Create the axes
     axes = Axes3D(figure)
 
-    # Plot the surface
+    # Plot the scatterplot
     axes.scatter(xs, ys, zs)
 
     # Add the axis titles
@@ -228,10 +228,15 @@ def plot_surface_from_table_iterator(table_iterator, figure, options, wireframe=
     for i, x in enumerate(xs):
         for j, y in enumerate(ys):
             zs[i, j] = zdict.get((x, y), NaN)
-    xs, ys = meshgrid(sorted(xs), sorted(ys))
+    ys, xs = meshgrid(sorted(ys), sorted(xs))
+    zs = masked_where(isnan(zs), zs)
+    # Use the minimum value instead of NaNs -- this is because Matplotlib
+    # won't apply the colormap if there are NaNs in the data
+    zs = zs.filled(zs.min())
 
     # Import 3D axes
     from mpl_toolkits.mplot3d import Axes3D
+    from matplotlib import cm
 
     # Create the axes
     axes = Axes3D(figure)
@@ -240,7 +245,7 @@ def plot_surface_from_table_iterator(table_iterator, figure, options, wireframe=
     if wireframe:
         axes.plot_wireframe(xs, ys, zs)
     else:
-        axes.plot_surface(xs, ys, zs)
+        axes.plot_surface(xs, ys, zs, rstride=1, cstride=1, cmap=cm.jet)
 
     # Add the axis titles
     if options.xlabel:
