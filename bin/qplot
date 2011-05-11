@@ -11,7 +11,7 @@ from swissknife.utils import lenient_float, open_anything, parse_index_specifica
         TableWithHeaderIterator
 
 from itertools import cycle, islice, izip
-from numpy import array, isnan, NaN
+from numpy import array, isnan, meshgrid, zeros, NaN
 from numpy.ma import masked_where
 
 import optparse
@@ -49,8 +49,9 @@ def create_option_parser():
     parser.add_option("-o", "--output", metavar="FILE", dest="output",
             default=None, help="save the output to the given FILE")
     parser.add_option("-t", "--type", metavar="TYPE", dest="type",
-            choices=("line", "scatter3d"), default="line",
-            help="the type of plot to draw (line or scatter3d)")
+            choices=("line", "scatter3d", "surface", "wireframe"), default="line",
+            help="the type of plot to draw (line, scatter3d, surface "
+                 "or wireframe)")
     parser.add_option("--title", metavar="TITLE", dest="title",
             default=None, help="set the title of the plot to TITLE. "
             "The default title is the input filename.")
@@ -171,16 +172,16 @@ def plot_line_from_table_iterator(table_iterator, figure, options):
 def plot_scatter3d_from_table_iterator(table_iterator, figure, options):
     """Plots a 3D scatterplot whose points come from the given `table_iterator`.
     The plot will be drawn on `figure`."""
+
     xs, ys, zs = [], [], []
     for values in table_iterator:
         # Less than three values? If so, skip this line.
         if len(values) < 3:
             continue
-
         # Any of the values missing? If so, skip this line
         if any(value is None for value in values):
             continue
-
+        # Store the values
         xs.append(values[0])
         ys.append(values[1])
         zs.append(values[2])
@@ -192,7 +193,6 @@ def plot_scatter3d_from_table_iterator(table_iterator, figure, options):
     axes = Axes3D(figure)
 
     # Plot the surface
-    # xs, ys, zs = array([xs]), array([ys]), array([zs])
     axes.scatter(xs, ys, zs)
 
     # Add the axis titles
@@ -204,6 +204,59 @@ def plot_scatter3d_from_table_iterator(table_iterator, figure, options):
         axes.set_zlabel(options.zlabel)
 
     return figure
+
+def plot_surface_from_table_iterator(table_iterator, figure, options, wireframe=False):
+    """Plots a 3D surface whose points come from the given `table_iterator`.
+    The plot will be drawn on `figure`."""
+
+    xs, ys, zdict = set(), set(), {}
+    for values in table_iterator:
+        # Less than three values? If so, skip this line.
+        if len(values) < 3:
+            continue
+        # Any of the values missing? If so, skip this line
+        if any(value is None for value in values):
+            continue
+        # Store the values
+        xs.add(values[0])
+        ys.add(values[1])
+        zdict[values[0], values[1]] = values[2]
+
+    # Create the mesh grid and fill the Z values
+    xs, ys = sorted(xs), sorted(ys)
+    zs = zeros((len(xs), len(ys)))
+    for i, x in enumerate(xs):
+        for j, y in enumerate(ys):
+            zs[i, j] = zdict.get((x, y), NaN)
+    xs, ys = meshgrid(sorted(xs), sorted(ys))
+
+    # Import 3D axes
+    from mpl_toolkits.mplot3d import Axes3D
+
+    # Create the axes
+    axes = Axes3D(figure)
+
+    # Plot the surface
+    if wireframe:
+        axes.plot_wireframe(xs, ys, zs)
+    else:
+        axes.plot_surface(xs, ys, zs)
+
+    # Add the axis titles
+    if options.xlabel:
+        axes.set_xlabel(options.xlabel)
+    if options.ylabel:
+        axes.set_ylabel(options.ylabel)
+    if options.zlabel:
+        axes.set_zlabel(options.zlabel)
+
+    return figure
+
+def plot_wireframe_from_table_iterator(table_iterator, figure, options):
+    """Plots a 3D  whose points come from the given `table_iterator`.
+    The plot will be drawn on `figure`."""
+    return plot_surface_from_table_iterator(table_iterator, figure, options,
+            wireframe=True)
 
 def main():
     """Main entry point of the script."""
