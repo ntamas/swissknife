@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+# vim:set ts=4 sw=4 sts=4 et:
 """\
 Usage: %prog [options] [infile]
 
@@ -12,6 +13,11 @@ import collections
 import optparse
 import sys
 
+
+class SkipException(Exception):
+    """Exception thrown when we should skip a row from the input
+    file."""
+    pass
 
 class cautiousdict(dict):
     """Python dict that returns the key itself if the key is not
@@ -27,6 +33,13 @@ class lenientdict(dict):
 
     def __missing__(self, key):
         return key
+
+class skippingdict(dict):
+    """Python dict that throws a SkipException if the key is not
+    found."""
+
+    def __missing__(self, key):
+        raise SkipException
 
 class universalset(collections.Set):
     """Set-like object that contains every object (even itself)"""
@@ -94,9 +107,9 @@ def create_option_parser():
     parser.add_option("-W", "--warn", action="store_true", dest="warn",
             default=False, help="print warning for IDs that cannot be remapped")
     parser.add_option("--missing", dest="missing_action",
-            default="ignore", choices=("ignore", "warn", "fail"),
+            default="ignore", choices=("ignore", "warn", "skip", "fail"),
             help="specifies what to do when an ID cannot be remapped. "
-                 "Must be one of ignore (default), warn or fail")
+                 "Must be one of ignore (default), warn, skip or fail")
     return parser
 
 def load_mapping(fname, options):
@@ -106,6 +119,8 @@ def load_mapping(fname, options):
         data = {}
     elif options.missing_action == "warn":
         data = cautiousdict()
+    elif options.missing_action == "skip":
+        data = skippingdict()
     else:
         data = lenientdict()
 
@@ -122,6 +137,7 @@ def remap_file(infile, mapper, options):
     for line in open_anything(infile):
         parts = line.strip().split(options.delimiter)
         new_parts = []
+        skip = False
         for idx, part in enumerate(parts, 1):
             try:
                 if idx in options.fields:
@@ -130,7 +146,11 @@ def remap_file(infile, mapper, options):
                     new_parts.append(part)
             except KeyError:
                 raise UnknownIDError(part)
-        print options.delimiter.join(new_parts)
+            except SkipException:
+                skip = True
+                break
+        if not skip:
+            print options.delimiter.join(new_parts)
 
 def main():
     """Main entry point of the script."""
@@ -161,7 +181,7 @@ def main():
         parser.error("either -m or --mapping-expr must be given")
 
     for infile in args:
-		remap_file(infile, mapper, options)
+        remap_file(infile, mapper, options)
 
 if __name__ == "__main__":
     try:
