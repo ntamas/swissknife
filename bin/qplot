@@ -11,11 +11,14 @@ from swissknife.utils import lenient_float, open_anything, parse_index_specifica
         TableWithHeaderIterator
 
 from itertools import cycle, islice, izip
-from numpy import array, isnan, meshgrid, zeros, NaN
+from numpy import arange, array, isnan, meshgrid, zeros, NaN
 from numpy.ma import masked_where
 
 import optparse
 import sys
+
+
+DEFAULT_COLORS = 'bgrcmyk'
 
 def create_option_parser():
     """Creates an `OptionParser` that parses the command line
@@ -49,9 +52,10 @@ def create_option_parser():
     parser.add_option("-o", "--output", metavar="FILE", dest="output",
             default=None, help="save the output to the given FILE")
     parser.add_option("-t", "--type", metavar="TYPE", dest="type",
-            choices=("line", "scatter3d", "surface", "wireframe"), default="line",
-            help="the type of plot to draw (line, scatter3d, surface "
-                 "or wireframe)")
+            choices=("bar", "line", "scatter3d", "surface", "wireframe"),
+            default="line",
+            help="the type of plot to draw (bar, line, scatter3d, surface "
+            "or wireframe)")
     parser.add_option("--title", metavar="TITLE", dest="title",
             default=None, help="set the title of the plot to TITLE. "
             "The default title is the input filename.")
@@ -81,6 +85,97 @@ def plot_file_on_figure(infile, figure, options):
         figure.suptitle(infile)
     else:
         figure.suptitle(options.title)
+
+
+def add_axis_titles(axes, options):
+    """Adds the titles on the given axes using the options given in
+    `options."""
+    # Add the axis titles
+    if options.xlabel:
+        axes.set_xlabel(options.xlabel)
+    if options.ylabel:
+        axes.set_ylabel(options.ylabel)
+    if options.zlabel and hasattr(axes, "set_zlabel"):
+        axes.set_zlabel(options.zlabel)
+
+def plot_bar_from_table_iterator(table_iterator, figure, options):
+    """Plots the dataset whose rows will be yielded by the given
+    `table_iterator` (an instance of `TableWithHeaderIterator`)
+    using bar plots. The plot will be drawn on `figure`."""
+    yss = []
+    for values in table_iterator:
+        # Less than one value? If so, skip this line.
+        if len(values) < 1:
+            continue
+
+        # Not enough columns? Add the missing ones.
+        if len(values) < len(yss):
+            values.extend([None] * (len(yss)-len(values)))
+
+        # For the time being, we put everything in yss and
+        # will separate them later into Y coordinates and
+        # error bars if options.errorbars is not none
+        if not yss:
+            # First row, must extend yss with columns
+            yss = [[y] for y in values]
+        else:
+            for ys, y in izip(yss, values):
+                ys.append(y)
+
+    headers = table_iterator.headers
+
+    # Calculate the legend labels
+    legend_handles, legend_labels = [], []
+    if yss and headers is not None:
+        legend_labels = headers[:]
+
+    # Mask NaNs in yss
+    yss = [[y if y is not None else NaN for y in ys] for ys in yss]
+    yss = array(yss)
+    yss = masked_where(isnan(yss), yss)
+
+    # Handle error bars
+    if options.errorbars == "y":
+        # Separate the error bars from the values
+        ncol = len(yss)
+        errorbars = yss[1::2]
+        yss = yss[::2]
+        legend_labels = legend_labels[:min(len(legend_labels), ncol):2]
+    else:
+        # No error bars
+        errorbars = None
+
+    # Set up the colors to be used
+    colors = DEFAULT_COLORS
+    styles = list(colors)
+
+    # Set up the list of axes we will use
+    all_axes = [figure.gca()]
+    if options.twin:
+        all_axes.append(figure.gca().twinx())
+
+    # Plot the bars
+    xs = arange(0, len(yss[0]))
+    bottoms = zeros(len(yss[0]))
+    i = 0
+    for axes, style, ys in izip(cycle(all_axes), cycle(styles), yss):
+        params = dict(left=xs, height=ys, bottom=bottoms, color=style)
+        if errorbars is not None:
+            params["yerr"] = errorbars[i]
+            i += 1
+
+        handle = axes.bar(**params)
+        legend_handles.append(handle)
+
+        bottoms += ys
+
+    # Add the axis titles
+    add_axis_titles(all_axes[0], options)
+
+    # Add the legend
+    if legend_labels:
+        legend_obj = all_axes[0].legend(legend_handles, legend_labels)
+        legend_obj.legendPatch.set_alpha(0.75)
 
 def plot_line_from_table_iterator(table_iterator, figure, options):
     """Plots the dataset whose rows will be yielded by the given
@@ -137,7 +232,7 @@ def plot_line_from_table_iterator(table_iterator, figure, options):
         errorbars = None
 
     # Set up the line styles to be used
-    colors = 'bgrcmyk'
+    colors = DEFAULT_COLORS
     styles = '- -- -. :'.split()
     line_styles = [color+style for style in styles for color in colors]
     bar_styles = [color+'o' for style in styles for color in colors]
@@ -159,10 +254,7 @@ def plot_line_from_table_iterator(table_iterator, figure, options):
             axes.errorbar(xs, ys, yerr=yerrs, fmt=style)
 
     # Add the axis titles
-    if options.xlabel:
-        all_axes[0].set_xlabel(options.xlabel)
-    if options.ylabel:
-        all_axes[0].set_ylabel(options.ylabel)
+    add_axis_titles(all_axes[0], options)
 
     # Add the legend
     if legend_labels:
@@ -196,12 +288,7 @@ def plot_scatter3d_from_table_iterator(table_iterator, figure, options):
     axes.scatter(xs, ys, zs)
 
     # Add the axis titles
-    if options.xlabel:
-        axes.set_xlabel(options.xlabel)
-    if options.ylabel:
-        axes.set_ylabel(options.ylabel)
-    if options.zlabel:
-        axes.set_zlabel(options.zlabel)
+    add_axis_titles(axes, options)
 
     return figure
 
