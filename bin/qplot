@@ -7,8 +7,8 @@ Plots columns from a data file using Matplotlib.
 """
 
 from swissknife.error import AppError
-from swissknife.utils import lenient_float, open_anything, parse_index_specification, \
-        TableWithHeaderIterator
+from swissknife.utils import lenient_float, open_anything, parse_date, \
+        parse_index_specification, TableWithHeaderIterator
 
 from itertools import cycle, islice, izip
 from numpy import array, isnan, meshgrid, zeros, NaN
@@ -31,6 +31,18 @@ def create_option_parser():
             dest="delimiter", default="\t",
             help="use DELIM instad of TAB for field delimiter "
                  "in the input file")
+    parser.add_option("-D", "--dates", metavar="AXES",
+            dest="dates", choices=("none", "x"), default="none",
+            help="assume that the given AXES contain dates. If AXES=none, "
+                 "both the X and the Y coordinates will be treated as "
+                 "numbers. If AXES=x, the X axis will be treated as a "
+                 "date. Use --date-format to specify the format of the date. "
+                 "Support for dates on the Y axis may be added later.")
+    parser.add_option("--date-format", metavar="FORMAT",
+            dest="date_format", default="%Y-%m-%d",
+            help="use the given FORMAT to parse dates. FORMAT is a "
+            "format string that must be accepted by datetime.strptime. "
+            "Default: %default")
     parser.add_option("-f", "--fields", metavar="LIST",
             dest="fields", default=[], action="callback",
             type="str", callback=indexspec_callback,
@@ -45,13 +57,14 @@ def create_option_parser():
             help="use errorbars on the given AXES. If AXES=none, "
                  "no error bars will be used. If AXES=y, every second column "
                  "after the 2nd one (i.e. the 3rd, 5th, 7th etc) is assumed to "
-                 "be an error bar for the value in the previous column.")
+                 "be an error bar for the value in the previous column. "
+                 "Default: %default")
     parser.add_option("-o", "--output", metavar="FILE", dest="output",
             default=None, help="save the output to the given FILE")
     parser.add_option("-t", "--type", metavar="TYPE", dest="type",
             choices=("line", "scatter3d", "surface", "wireframe"), default="line",
             help="the type of plot to draw (line, scatter3d, surface "
-                 "or wireframe)")
+            "or wireframe). Default: %default")
     parser.add_option("--title", metavar="TITLE", dest="title",
             default=None, help="set the title of the plot to TITLE. "
             "The default title is the input filename.")
@@ -73,12 +86,14 @@ def plot_file_on_figure(infile, figure, options):
             delimiter=options.delimiter,
             fields=options.fields
     )
+    iterator.first_column_is_date = ("x" in options.dates)
     func = globals()["plot_%s_from_table_iterator" % options.type]
     func(iterator, figure, options)
 
     # Add the title
     if options.title is None:
-        figure.suptitle(infile)
+        if infile != "-":
+            figure.suptitle(infile)
     else:
         figure.suptitle(options.title)
 
@@ -115,6 +130,12 @@ def plot_line_from_table_iterator(table_iterator, figure, options):
     if yss and headers is not None:
         legend_labels = headers[1:]
 
+    # If the x axis contains dates, map them to dates since 0001-01-01 UTC
+    # since Matplotlib requires this
+    if options.dates == "x" or options.dates == "xy":
+        xs = [parse_date(x, format=options.date_format, default=NaN, ordinal=True)
+                for x in xs]
+
     # Mask NaNs in xs
     xs = [x if x is not None else NaN for x in xs]
     xs = array(xs)
@@ -149,7 +170,10 @@ def plot_line_from_table_iterator(table_iterator, figure, options):
 
     # Plot the lines
     for axes, style, ys in izip(cycle(all_axes), cycle(line_styles), yss):
-        handle = axes.plot(xs, ys, style)
+        if options.dates != "none":
+            handle = axes.plot_date(xs, ys, style)
+        else:
+            handle = axes.plot(xs, ys, style)
         legend_handles.append(handle)
 
     # Plot the error bars if needed
