@@ -1,6 +1,8 @@
 
 from __future__ import division
 
+from datetime import datetime
+
 def first(iterable):
     """Returns the first element of the iterable."""
     for item in iterable:
@@ -42,6 +44,7 @@ class TableWithHeaderIterator(object):
         is ``None``, all columns will be considered."""
         self.delimiter = delimiter
         self.fields = fields
+        self.first_column_is_date = False
         self.fp = fp
         self.seen_header = False
         self.headers = None
@@ -49,18 +52,20 @@ class TableWithHeaderIterator(object):
     def __iter__(self):
         for line in self.fp:
             parts = line.strip("\r\n").split(self.delimiter)
-            if not self.fields:
+            if self.fields:
+                parts = sublist(parts, self.fields)
+            if not parts:
+                continue
+
+            if not self.first_column_is_date:
                 values = [lenient_float(num) for num in parts]
             else:
-                values = [lenient_float(parts[i]) for i in self.fields]
+                values = [parts[0]] + [lenient_float(num) for num in parts[1:]]
 
             if not self.seen_header:
                 # No data yet, maybe this is the header?
                 if any(value is None for value in values):
-                    if not self.fields:
-                        self.headers = parts
-                    else:
-                        self.headers = sublist(parts, self.fields)
+                    self.headers = parts
                     self.seen_header = True
                     continue
 
@@ -151,6 +156,21 @@ def open_anything(fname, *args, **kwds):
     else:
         infile = open(fname, *args, **kwds)
     return infile
+
+def parse_date(date_string, format="%Y-%m-%d", default=None, ordinal=False):
+    """Parses a string and returns a ``datetime`` instance (when `ordinal` is
+    ``False``) or an ordinal number representing the number of days that have
+    passed since 0001-01-01 UTC.
+
+    Whenthe date cannot be parsed, the function will return the value of
+    `default`. `format` specifies the date format to use."""
+    try:
+        result = datetime.strptime(date_string, format)
+    except TypeError, ValueError:
+        return default
+    if ordinal:
+        return result.toordinal()
+    return result
 
 def parse_index_specification(spec):
     """Parses an index specification used as arguments for the -f
