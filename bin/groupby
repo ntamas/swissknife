@@ -1,0 +1,101 @@
+#!/usr/bin/env python
+"""\
+Usage: %prog [options] infile
+
+Groups rows of a tabular data file by the values of a given column.
+"""
+
+from __future__ import print_function
+
+from swissknife.error import AppError
+from swissknife.utils import open_anything, parse_index_specification, \
+        sublist
+
+from collections import defaultdict
+from itertools import chain
+import optparse
+import sys
+
+def create_option_parser():
+    """Creates an `OptionParser` that parses the command line
+    options."""
+
+    def indexspec_callback(option, opt_str, value, parser):
+        setattr(parser.values, option.dest,
+                parse_index_specification(value))
+
+    parser = optparse.OptionParser(usage=
+            sys.modules[__name__].__doc__.strip())
+    parser.add_option("-d", "--delimiter", metavar="DELIM",
+            dest="in_delimiter", default="\t",
+            help="use DELIM instad of TAB for field delimiter "
+                 "in the input file")
+    parser.add_option("-D", "--output-delimiter", metavar="DELIM",
+            dest="out_delimiter", default="\t",
+            help="use DELIM instead of TAB for field delimiter "
+                 "in the output file")
+    parser.add_option("-f", "--fields", metavar="LIST",
+            dest="fields", default=None, action="callback",
+            type="str", callback=indexspec_callback,
+            help="use only these columns from the input. The first "
+                 "column is always the column to join on.")
+
+    return parser
+
+def process_file(infile, options):
+    """Processes the given file."""
+    # Calculate the column indices we are interested in
+    if options.fields:
+        col_idxs = [f-1 for f in options.fields]
+    else:
+        col_idxs = None
+
+    # Dictionary to map keys to values
+    keys_to_values = defaultdict(list)
+
+    # Some caching to avoid costly lookups
+    delim = options.in_delimiter
+    fields = options.fields
+    join = options.out_delimiter.join
+
+    for line in open_anything(infile):
+        # Split the input line
+        parts = line.strip().split(delim)
+
+        # Select the relevant columns only
+        if col_idxs:
+            parts = sublist(parts, col_idxs)
+
+        # If the row is empty, continue
+        if not parts:
+            continue
+
+        # Store the row to its appropriate key
+        keys_to_values[parts[0]].extend(parts[1:])
+
+    # Print the key-value pairs
+    for key, values in keys_to_values.iteritems():
+        print(join(chain([key], values)))
+
+
+def main():
+    """Main entry point of the script."""
+    parser = create_option_parser()
+    options, args = parser.parse_args()
+
+    if options.fields:
+        options.fields = list(options.fields)
+
+    if not args:
+        args = ["-"]
+
+    for arg in args:
+        process_file(arg, options)
+
+if __name__ == "__main__":
+    try:
+        sys.exit(main())
+    except Exception as ex:
+        print(ex, file=sys.stderr)
+        raise
+        sys.exit(1)
