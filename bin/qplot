@@ -15,6 +15,7 @@ from numpy import arange, array, isnan, meshgrid, zeros, NaN
 from numpy.ma import masked_where
 
 import optparse
+import re
 import sys
 
 
@@ -113,6 +114,30 @@ def add_axis_titles(axes, options):
     if options.zlabel and hasattr(axes, "set_zlabel"):
         axes.set_zlabel(options.zlabel)
 
+
+def parse_headers(headers):
+    """Iterates over the headers of the input file and tries to
+    extract style specifications out of them.
+
+    A header contains a style specification if it ends with a substring in
+    double square brackets (i.e. ``[[...]]``). This function will return
+    two lists. The first contains the header strings *without* the style
+    specifications (if there were any), the second contains the style
+    specifications themselves or ``None`` if a header did not have a style
+    specification at all."""
+    new_headers, specs = [], []
+    rex = re.compile(r"(.*)\[\[([^\]]+)]]$")
+    for header in headers:
+        match = rex.match(header)
+        if match:
+            new_headers.append(match.group(1).strip())
+            specs.append(match.group(2))
+        else:
+            new_headers.append(header)
+            specs.append(None)
+    return new_headers, specs
+
+
 def plot_bar_from_table_iterator(table_iterator, figure, options):
     """Plots the dataset whose rows will be yielded by the given
     `table_iterator` (an instance of `TableWithHeaderIterator`)
@@ -137,7 +162,7 @@ def plot_bar_from_table_iterator(table_iterator, figure, options):
             for ys, y in izip(yss, values):
                 ys.append(y)
 
-    headers = table_iterator.headers
+    headers, style_overrides = parse_headers(table_iterator.headers)
 
     # Calculate the legend labels
     legend_handles, legend_labels = [], []
@@ -163,6 +188,10 @@ def plot_bar_from_table_iterator(table_iterator, figure, options):
     # Set up the colors to be used
     colors = DEFAULT_COLORS
     styles = list(colors)
+
+    # Override the line styles where the header says so
+    styles = [override if override is not None else style
+            for style, override in izip(styles, style_overrides[1:])]
 
     # Set up the list of axes we will use
     all_axes = [figure.gca()]
@@ -218,7 +247,7 @@ def plot_line_from_table_iterator(table_iterator, figure, options):
             for ys, y in izip(yss, islice(values, 1, None)):
                 ys.append(y)
 
-    headers = table_iterator.headers
+    headers, style_overrides = parse_headers(table_iterator.headers)
 
     # Calculate the legend labels
     legend_handles, legend_labels = [], []
@@ -257,6 +286,12 @@ def plot_line_from_table_iterator(table_iterator, figure, options):
     styles = '- -- -. :'.split()
     line_styles = [color+style for style in styles for color in colors]
     bar_styles = [color+'o' for style in styles for color in colors]
+
+    # Override the line styles where the header says so
+    line_styles = [override if override is not None else style
+            for style, override in izip(line_styles, style_overrides[1:])]
+    bar_styles = [override if override is not None else style
+            for style, override in izip(bar_styles, style_overrides[1:])]
 
     # Set up the list of axes we will use
     all_axes = [figure.gca()]
