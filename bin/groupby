@@ -39,6 +39,9 @@ def create_option_parser():
             type="str", callback=indexspec_callback,
             help="use only these columns from the input. The first "
                  "column is always the column to join on.")
+    parser.add_option("-u", "--unique", action="store_true",
+            dest="unique", default=False,
+            help="keep unique entries only")
 
     return parser
 
@@ -51,7 +54,10 @@ def process_file(infile, options):
         col_idxs = None
 
     # Dictionary to map keys to values
-    keys_to_values = defaultdict(list)
+    if options.unique:
+        keys_to_values = defaultdict(set)
+    else:
+        keys_to_values = defaultdict(list)
 
     # Some caching to avoid costly lookups
     delim = options.in_delimiter
@@ -71,7 +77,10 @@ def process_file(infile, options):
             continue
 
         # Store the row to its appropriate key
-        keys_to_values[parts[0]].extend(parts[1:])
+        if options.unique:
+            keys_to_values[parts[0]].update(parts[1:])
+        else:
+            keys_to_values[parts[0]].extend(parts[1:])
 
     # Print the key-value pairs
     for key, values in keys_to_values.iteritems():
