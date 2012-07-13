@@ -70,6 +70,8 @@ def create_option_parser():
             default="line",
             help="the type of plot to draw (bar, line, scatter3d, surface "
             "or wireframe)")
+    parser.add_option("--strip", action="store_true", dest="strip", default=False,
+            help="strip leading and trailing whitespace from each line")
     parser.add_option("--title", metavar="TITLE", dest="title",
             default=None, help="set the title of the plot to TITLE. "
             "The default title is the input filename.")
@@ -89,7 +91,8 @@ def plot_file_on_figure(infile, figure, options):
     iterator = TableWithHeaderIterator(
             open_anything(infile),
             delimiter=options.delimiter,
-            fields=options.fields
+            fields=options.fields,
+            strip=options.strip
     )
     iterator.first_column_is_date = ("x" in options.dates)
     func = globals()["plot_%s_from_table_iterator" % options.type]
@@ -209,7 +212,7 @@ def plot_bar_from_table_iterator(table_iterator, figure, options):
             i += 1
 
         handle = axes.bar(**params)
-        legend_handles.append(handle)
+        legend_handles.append(handle[0])
 
         bottoms += ys
 
@@ -304,7 +307,7 @@ def plot_line_from_table_iterator(table_iterator, figure, options):
             handle = axes.plot_date(xs, ys, style)
         else:
             handle = axes.plot(xs, ys, style)
-        legend_handles.append(handle)
+        legend_handles.append(handle[0])
 
     # Plot the error bars if needed
     if errorbars is not None:

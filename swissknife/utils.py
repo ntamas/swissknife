@@ -37,21 +37,26 @@ class TableWithHeaderIterator(object):
     """Iterates over rows of a stream that contain a table in tabular format,
     with an optional header."""
 
-    def __init__(self, fp, delimiter=None, fields=None):
+    def __init__(self, fp, delimiter=None, fields=None, strip=False):
         """Creates an iterator that reads the given stream `fp` and uses
         the given `delimiter` character. ``None`` means any whitespace
         character. `fields` specifies which columns to filter on; if it
-        is ``None``, all columns will be considered."""
+        is ``None``, all columns will be considered. `strip` specifies
+        whether to strip all leading and trailing whitespace from lines
+        or not."""
         self.delimiter = delimiter
         self.fields = fields
         self.first_column_is_date = False
         self.fp = fp
         self.seen_header = False
+        self.strip = bool(strip)
         self.headers = None
 
     def __iter__(self):
+        chars_to_strip = " \t\r\n" if self.strip else "\r\n"
+
         for line in self.fp:
-            parts = line.strip("\r\n").split(self.delimiter)
+            parts = line.strip(chars_to_strip).split(self.delimiter)
             if self.fields:
                 parts = sublist(parts, self.fields)
             if not parts:

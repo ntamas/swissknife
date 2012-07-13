@@ -42,6 +42,8 @@ def create_option_parser():
     parser.add_option("-u", "--unique", action="store_true",
             dest="unique", default=False,
             help="keep unique entries only")
+    parser.add_option("--strip", action="store_true", dest="strip", default=False,
+            help="strip leading and trailing whitespace from each line")
 
     return parser
 
@@ -64,9 +66,12 @@ def process_file(infile, options):
     fields = options.fields
     join = options.out_delimiter.join
 
+    # Set up characters to strip from lines
+    chars_to_strip = " \t\r\n" if options.strip else "\r\n"
+
     for line in open_anything(infile):
         # Split the input line
-        parts = line.strip().split(delim)
+        parts = line.strip(chars_to_strip).split(delim)
 
         # Select the relevant columns only
         if col_idxs:

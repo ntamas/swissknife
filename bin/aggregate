@@ -62,6 +62,8 @@ def create_option_parser():
             choices=("column", "multiple"), default="multiple",
             help="set the aggregation MODE. Possible values are: column "
                  "or multiple. See the documentation for more details.")
+    parser.add_option("--strip", action="store_true", dest="strip", default=False,
+            help="strip leading and trailing whitespace from each line")
 
     return parser
 
@@ -90,6 +92,9 @@ def process_files_column_single(fp, options, first_file=False):
     func = options.function
     join = options.out_delimiter.join
 
+    # Set up characters to strip from lines
+    chars_to_strip = " \t\r\n" if options.strip else "\r\n"
+
     # Flag to denote whether we have seen at least one row with numbers.
     # If not, we are still processing the headers.
     data_started = False
@@ -97,7 +102,7 @@ def process_files_column_single(fp, options, first_file=False):
 
     for line in fp:
         # Split the input line
-        line = line.strip().split(delim)
+        line = line.strip(chars_to_strip).split(delim)
 
         # Select the relevant columns only
         if col_idxs:
