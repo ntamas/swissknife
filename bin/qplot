@@ -10,7 +10,7 @@ from swissknife.error import AppError
 from swissknife.utils import lenient_float, open_anything, parse_date, \
         parse_index_specification, TableWithHeaderIterator
 
-from itertools import cycle, islice, izip
+from itertools import cycle, islice, izip, izip_longest
 from numpy import arange, array, isnan, meshgrid, zeros, NaN
 from numpy.ma import masked_where
 
@@ -128,6 +128,9 @@ def parse_headers(headers):
     specifications (if there were any), the second contains the style
     specifications themselves or ``None`` if a header did not have a style
     specification at all."""
+    if headers is None:
+        return None, []
+
     new_headers, specs = [], []
     rex = re.compile(r"(.*)\[\[([^\]]+)]]$")
     for header in headers:
@@ -194,7 +197,7 @@ def plot_bar_from_table_iterator(table_iterator, figure, options):
 
     # Override the line styles where the header says so
     styles = [override if override is not None else style
-            for style, override in izip(styles, style_overrides[1:])]
+            for style, override in izip_longest(styles, style_overrides[1:])]
 
     # Set up the list of axes we will use
     all_axes = [figure.gca()]
@@ -292,9 +295,9 @@ def plot_line_from_table_iterator(table_iterator, figure, options):
 
     # Override the line styles where the header says so
     line_styles = [override if override is not None else style
-            for style, override in izip(line_styles, style_overrides[1:])]
+            for style, override in izip_longest(line_styles, style_overrides[1:])]
     bar_styles = [override if override is not None else style
-            for style, override in izip(bar_styles, style_overrides[1:])]
+            for style, override in izip_longest(bar_styles, style_overrides[1:])]
 
     # Set up the list of axes we will use
     all_axes = [figure.gca()]
