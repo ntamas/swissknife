@@ -38,6 +38,11 @@ Script index
     1000 files. It is also capable of recognizing headers in the input
     files; these will be printed intact to the output file.
 
+``groupby``
+    Takes a tabular input file where one of the columns is considered
+    a primary key, and collects entries in each row with the same
+    primary key into a single row in the output file.
+
 ``remap``
     Script that can be used to remap columns of entries in a text file
     based on an external mapping file that maps old entry values to new
