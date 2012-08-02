@@ -37,14 +37,16 @@ class TableWithHeaderIterator(object):
     """Iterates over rows of a stream that contain a table in tabular format,
     with an optional header."""
 
-    def __init__(self, fp, delimiter=None, fields=None, strip=False):
+    def __init__(self, fp, delimiter=None, every=1, fields=None, strip=False):
         """Creates an iterator that reads the given stream `fp` and uses
         the given `delimiter` character. ``None`` means any whitespace
         character. `fields` specifies which columns to filter on; if it
         is ``None``, all columns will be considered. `strip` specifies
         whether to strip all leading and trailing whitespace from lines
-        or not."""
+        or not. `every` allows one to specify that only every nth data
+        line should be considered from the input file."""
         self.delimiter = delimiter
+        self.every = max(1, int(every))
         self.fields = fields
         self.first_column_is_date = False
         self.fp = fp
@@ -54,7 +56,9 @@ class TableWithHeaderIterator(object):
 
     def __iter__(self):
         chars_to_strip = " \t\r\n" if self.strip else "\r\n"
+        every = self.every
 
+        line_number = 0
         for line in self.fp:
             parts = line.strip(chars_to_strip).split(self.delimiter)
             if self.fields:
@@ -74,7 +78,11 @@ class TableWithHeaderIterator(object):
                     self.seen_header = True
                     continue
 
-            yield values
+            # This is a real data line. Decide whether to consider it or not.
+            if every <= 1 or line_number % every == 0:
+                yield values
+
+            line_number += 1
 
 
 def last(iterable):

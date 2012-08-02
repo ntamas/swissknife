@@ -47,6 +47,8 @@ def create_option_parser():
             help="use the given FORMAT to parse dates. FORMAT is a "
             "format string that must be accepted by datetime.strptime. "
             "Default: %default")
+    parser.add_option("--every", metavar="N", dest="every", default=1,
+            help="use only the header and every Nth line from the input file")
     parser.add_option("-f", "--fields", metavar="LIST",
             dest="fields", default=[], action="callback",
             type="str", callback=indexspec_callback,
@@ -91,6 +93,7 @@ def plot_file_on_figure(infile, figure, options):
     iterator = TableWithHeaderIterator(
             open_anything(infile),
             delimiter=options.delimiter,
+            every=options.every,
             fields=options.fields,
             strip=options.strip
     )
