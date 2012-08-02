@@ -28,12 +28,12 @@ def create_option_parser():
             sys.modules[__name__].__doc__.strip())
     parser.add_option("-d", "--delimiter", metavar="DELIM",
             dest="in_delimiter", default="\t",
-            help="use DELIM instad of TAB for field delimiter "
-                 "in the input file")
+            help="use DELIM for field delimiter in the input file "
+                 "instead of TAB")
     parser.add_option("-D", "--output-delimiter", metavar="DELIM",
-            dest="out_delimiter", default="\t",
-            help="use DELIM instead of TAB for field delimiter "
-                 "in the output file")
+            dest="out_delimiter", default=None,
+            help="use DELIM for field delimiter in the output file "
+			     "instead of the input delimiter")
     parser.add_option("-f", "--fields", metavar="LIST",
             dest="fields", default=None, action="callback",
             type="str", callback=indexspec_callback,
@@ -97,6 +97,9 @@ def main():
     parser = create_option_parser()
     options, args = parser.parse_args()
 
+    if options.out_delimiter is None:
+        options.out_delimiter = options.in_delimiter
+    
     if options.fields:
         options.fields = list(options.fields)
 
