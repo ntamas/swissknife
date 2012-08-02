@@ -14,8 +14,13 @@ import optparse
 import sys
 
 
-class SkipException(Exception):
+class SkipRowException(Exception):
     """Exception thrown when we should skip a row from the input
+    file."""
+    pass
+
+class SkipColumnException(Exception):
+    """Exception thrown when we should skip a column from the input
     file."""
     pass
 
@@ -35,11 +40,19 @@ class lenientdict(dict):
         return key
 
 class skippingdict(dict):
-    """Python dict that throws a SkipException if the key is not
+    """Python dict that throws a specific exception (typically
+    `SkipRowException` or `SkipColumnException`) if the key is not
     found."""
 
+    def __init__(self, *args, **kwds):
+        if "exc" in kwds:
+            self.exc = kwds["exc"]
+            del kwds["exc"]
+        else:
+            self.exc = SkipRowException
+
     def __missing__(self, key):
-        raise SkipException
+        raise self.exc
 
 class universalset(collections.Set):
     """Set-like object that contains every object (even itself)"""
@@ -107,9 +120,9 @@ def create_option_parser():
     parser.add_option("-W", "--warn", action="store_true", dest="warn",
             default=False, help="print warning for IDs that cannot be remapped")
     parser.add_option("--missing", dest="missing_action",
-            default="ignore", choices=("ignore", "warn", "skip", "fail"),
+            default="ignore", choices=("ignore", "warn", "skip", "fail", "empty"),
             help="specifies what to do when an ID cannot be remapped. "
-                 "Must be one of ignore (default), warn, skip or fail")
+                 "Must be one of ignore (default), warn, skip, empty or fail")
     return parser
 
 def load_mapping(fname, options):
@@ -120,7 +133,9 @@ def load_mapping(fname, options):
     elif options.missing_action == "warn":
         data = cautiousdict()
     elif options.missing_action == "skip":
-        data = skippingdict()
+        data = skippingdict(exc=SkipRowException)
+    elif options.missing_action == "empty":
+        data = skippingdict(exc=SkipColumnException)
     else:
         data = lenientdict()
 
@@ -146,7 +161,9 @@ def remap_file(infile, mapper, options):
                     new_parts.append(part)
             except KeyError:
                 raise UnknownIDError(part)
-            except SkipException:
+            except SkipColumnException:
+                pass
+            except SkipRowException:
                 skip = True
                 break
         if not skip:
