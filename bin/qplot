@@ -7,8 +7,8 @@ Plots columns from a data file using Matplotlib.
 """
 
 from swissknife.error import AppError
-from swissknife.utils import lenient_float, open_anything, parse_date, \
-        parse_index_specification, TableWithHeaderIterator
+from swissknife.utils import lenient_float, mask_nans, open_anything, \
+        parse_date, parse_index_specification, TableWithHeaderIterator
 
 from itertools import cycle, islice, izip, izip_longest
 from numpy import arange, array, isnan, meshgrid, zeros, NaN
@@ -68,9 +68,9 @@ def create_option_parser():
     parser.add_option("-o", "--output", metavar="FILE", dest="output",
             default=None, help="save the output to the given FILE")
     parser.add_option("-t", "--type", metavar="TYPE", dest="type",
-            choices=("bar", "line", "scatter3d", "surface", "wireframe"),
+            choices=("bar", "line", "quiver", "scatter3d", "surface", "wireframe"),
             default="line",
-            help="the type of plot to draw (bar, line, scatter3d, surface "
+            help="the type of plot to draw (bar, line, quiver, scatter3d, surface "
             "or wireframe)")
     parser.add_option("--strip", action="store_true", dest="strip", default=False,
             help="strip leading and trailing whitespace from each line")
@@ -230,6 +230,7 @@ def plot_bar_from_table_iterator(table_iterator, figure, options):
         legend_obj = all_axes[0].legend(legend_handles, legend_labels)
         legend_obj.legendPatch.set_alpha(0.75)
 
+
 def plot_line_from_table_iterator(table_iterator, figure, options):
     """Plots the dataset whose rows will be yielded by the given
     `table_iterator` (an instance of `TableWithHeaderIterator`).
@@ -270,9 +271,7 @@ def plot_line_from_table_iterator(table_iterator, figure, options):
                 for x in xs]
 
     # Mask NaNs in xs
-    xs = [x if x is not None else NaN for x in xs]
-    xs = array(xs)
-    xs = masked_where(isnan(xs), xs)
+    xs = mask_nans(xs)
 
     # Mask NaNs in yss
     yss = [[y if y is not None else NaN for y in ys] for ys in yss]
@@ -329,6 +328,45 @@ def plot_line_from_table_iterator(table_iterator, figure, options):
         legend_obj = all_axes[0].legend(legend_handles, legend_labels)
         legend_obj.legendPatch.set_alpha(0.75)
 
+
+def plot_quiver_from_table_iterator(table_iterator, figure, options):
+    """Plots a 2D quiver plot (a.k.a. vector field) whose points come from the
+    given `table_iterator`. The plot will be drawn on `figure`."""
+
+    xs, ys, us, vs = [], [], [], []
+    for values in table_iterator:
+        # Less than two values? If so, skip this line.
+        if len(values) < 2:
+            continue
+        # Pad the values with zeros up to length 4
+        if len(values) < 4:
+            values += [0.0] * (4 - len(values))
+        # Any of the values missing? If so, skip this line
+        if any(value is None for value in values):
+            continue
+        # Store the values
+        xs.append(values[0])
+        ys.append(values[1])
+        us.append(values[2])
+        vs.append(values[3])
+
+    # Mask NaNs in us and vs. Matplotlib does not support masks in
+    # xs or ys
+    us = mask_nans(us)
+    vs = mask_nans(vs)
+
+    # Get the axis
+    axis = figure.gca()
+
+    # Plot the quiver plot
+    axis.quiver(xs, ys, us, vs, angles="xy", pivot="tail", color="blue")
+
+    # Add the axis titles
+    add_axis_titles(axis, options)
+
+    return figure
+
+
 def plot_scatter3d_from_table_iterator(table_iterator, figure, options):
     """Plots a 3D scatterplot whose points come from the given `table_iterator`.
     The plot will be drawn on `figure`."""
@@ -359,6 +397,7 @@ def plot_scatter3d_from_table_iterator(table_iterator, figure, options):
     add_axis_titles(axes, options)
 
     return figure
+
 
 def plot_surface_from_table_iterator(table_iterator, figure, options, wireframe=False):
     """Plots a 3D surface whose points come from the given `table_iterator`.
@@ -403,20 +442,17 @@ def plot_surface_from_table_iterator(table_iterator, figure, options, wireframe=
         axes.plot_surface(xs, ys, zs, rstride=1, cstride=1, cmap=cm.jet)
 
     # Add the axis titles
-    if options.xlabel:
-        axes.set_xlabel(options.xlabel)
-    if options.ylabel:
-        axes.set_ylabel(options.ylabel)
-    if options.zlabel:
-        axes.set_zlabel(options.zlabel)
+    add_axis_titles(axes, options)
 
     return figure
+
 
 def plot_wireframe_from_table_iterator(table_iterator, figure, options):
     """Plots a 3D  whose points come from the given `table_iterator`.
     The plot will be drawn on `figure`."""
     return plot_surface_from_table_iterator(table_iterator, figure, options,
             wireframe=True)
+
 
 def main():
     """Main entry point of the script."""

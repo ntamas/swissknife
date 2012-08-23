@@ -99,6 +99,15 @@ def lenient_float(value, default=None):
     except ValueError:
         return default
 
+def mask_nans(xs):
+    """Replaces None values with NaNs in the given numeric vector and
+    then masks all NaNs. Returns a masked NumPy array."""
+    from numpy import array, isnan
+    from numpy.ma import masked_where
+    xs = [x if x is not None else NaN for x in xs]
+    xs = array(xs)
+    return masked_where(isnan(xs), xs)
+
 def mean(items):
     """Returns the mean of the given items.
     
@@ -121,6 +130,9 @@ def mean_sd(items):
         True
     """
     m = mean(items)
+    if len(items) < 2:
+        return m, 0.0
+
     sqdiff = sum((item-m) ** 2 for item in items)
     return m, (sqdiff / (len(items)-1)) ** 0.5
 
