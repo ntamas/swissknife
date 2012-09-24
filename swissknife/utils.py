@@ -212,8 +212,11 @@ def parse_index_specification(spec):
 
 def parse_range_specification(spec):
     """Parses a range specification used as arguments for some options
-    in ``qplot``."""
-    return map(float, spec.split(":", 1))
+    in ``qplot``. Range specifications contain two numbers separated
+    by a colon (``:``). Either of the numbers may be replaced by an
+    underscore (``_``) or an empty string meaning 'automatic'."""
+    return [None if value == "_" or value == "" else float(value)
+            for value in spec.split(":", 1)]
 
 def sublist(l, idxs):
     return [l[i] for i in idxs]
