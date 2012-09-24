@@ -8,7 +8,8 @@ Plots columns from a data file using Matplotlib.
 
 from swissknife.error import AppError
 from swissknife.utils import lenient_float, mask_nans, open_anything, \
-        parse_date, parse_index_specification, TableWithHeaderIterator
+        parse_date, parse_index_specification, parse_range_specification, \
+        TableWithHeaderIterator
 
 from itertools import cycle, islice, izip, izip_longest
 from numpy import arange, array, isnan, meshgrid, zeros, NaN
@@ -28,6 +29,10 @@ def create_option_parser():
     def indexspec_callback(option, opt_str, value, parser):
         setattr(parser.values, option.dest,
                 parse_index_specification(value))
+
+    def rangespec_callback(option, opt_str, value, parser):
+        setattr(parser.values, option.dest,
+                parse_range_specification(value))
 
     parser = optparse.OptionParser(usage=
             sys.modules[__name__].__doc__.strip())
@@ -85,6 +90,16 @@ def create_option_parser():
             default="", help="set the title of the Y axis to LABEL")
     parser.add_option("--zlabel", metavar="LABEL", dest="zlabel",
             default="", help="set the title of the Z axis to LABEL (3D plots only)")
+    parser.add_option("--xrange", metavar="MIN:MAX", dest="xrange",
+            action="callback", callback=rangespec_callback, type="str",
+            default=None, help="set the range of the X axis to MIN:MAX")
+    parser.add_option("--yrange", metavar="MIN:MAX", dest="yrange",
+            action="callback", callback=rangespec_callback, type="str",
+            default=None, help="set the range of the Y axis to MIN:MAX")
+    parser.add_option("--zrange", metavar="MIN:MAX", dest="zrange",
+            action="callback", callback=rangespec_callback, type="str",
+            default=None,
+            help="set the range of the Z axis to MIN:MAX (3D plots only)")
 
     return parser
 
@@ -107,6 +122,17 @@ def plot_file_on_figure(infile, figure, options):
             figure.suptitle(infile)
     else:
         figure.suptitle(options.title)
+
+
+def set_axis_ranges(axes, options):
+    """Sets the ranges of the axes using the options given in
+    `options`."""
+    if options.xrange:
+        axes.set_xlim(*options.xrange)
+    if options.yrange:
+        axes.set_ylim(*options.yrange)
+    if options.zrange and hasattr(axes, "set_zlim"):
+        axes.set_zlim(*options.zrange)
 
 
 def add_axis_titles(axes, options):
@@ -225,6 +251,9 @@ def plot_bar_from_table_iterator(table_iterator, figure, options):
     # Add the axis titles
     add_axis_titles(all_axes[0], options)
 
+    # Set the axis ranges
+    set_axis_ranges(all_axes[0], options)
+
     # Add the legend
     if legend_labels:
         legend_obj = all_axes[0].legend(legend_handles, legend_labels)
@@ -323,6 +352,9 @@ def plot_line_from_table_iterator(table_iterator, figure, options):
     # Add the axis titles
     add_axis_titles(all_axes[0], options)
 
+    # Set the axis ranges
+    set_axis_ranges(all_axes[0], options)
+
     # Add the legend
     if legend_labels:
         legend_obj = all_axes[0].legend(legend_handles, legend_labels)
@@ -364,6 +396,9 @@ def plot_quiver_from_table_iterator(table_iterator, figure, options):
     # Add the axis titles
     add_axis_titles(axis, options)
 
+    # Set the axis ranges
+    set_axis_ranges(all_axes[0], options)
+
     return figure
 
 
@@ -395,6 +430,9 @@ def plot_scatter3d_from_table_iterator(table_iterator, figure, options):
 
     # Add the axis titles
     add_axis_titles(axes, options)
+
+    # Set the axis ranges
+    set_axis_ranges(all_axes[0], options)
 
     return figure
 
@@ -443,6 +481,9 @@ def plot_surface_from_table_iterator(table_iterator, figure, options, wireframe=
 
     # Add the axis titles
     add_axis_titles(axes, options)
+
+    # Set the axis ranges
+    set_axis_ranges(all_axes[0], options)
 
     return figure
 

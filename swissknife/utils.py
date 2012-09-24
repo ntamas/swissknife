@@ -210,6 +210,11 @@ def parse_index_specification(spec):
             result.append(int(part))
     return result
 
+def parse_range_specification(spec):
+    """Parses a range specification used as arguments for some options
+    in ``qplot``."""
+    return map(float, spec.split(":", 1))
+
 def sublist(l, idxs):
     return [l[i] for i in idxs]
 
