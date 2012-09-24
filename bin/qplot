@@ -397,7 +397,7 @@ def plot_quiver_from_table_iterator(table_iterator, figure, options):
     add_axis_titles(axis, options)
 
     # Set the axis ranges
-    set_axis_ranges(all_axes[0], options)
+    set_axis_ranges(axis, options)
 
     return figure
 
@@ -432,7 +432,7 @@ def plot_scatter3d_from_table_iterator(table_iterator, figure, options):
     add_axis_titles(axes, options)
 
     # Set the axis ranges
-    set_axis_ranges(all_axes[0], options)
+    set_axis_ranges(axes, options)
 
     return figure
 
@@ -483,7 +483,7 @@ def plot_surface_from_table_iterator(table_iterator, figure, options, wireframe=
     add_axis_titles(axes, options)
 
     # Set the axis ranges
-    set_axis_ranges(all_axes[0], options)
+    set_axis_ranges(axes, options)
 
     return figure
 
