@@ -9,9 +9,10 @@ Plots columns from a data file using Matplotlib.
 from swissknife.error import AppError
 from swissknife.utils import lenient_float, mask_nans, open_anything, \
         parse_date, parse_index_specification, parse_range_specification, \
-        TableWithHeaderIterator
+        parse_size_specification, TableWithHeaderIterator
 
 from itertools import cycle, islice, izip, izip_longest
+from math import ceil
 from numpy import arange, array, isnan, meshgrid, zeros, NaN
 from numpy.ma import masked_where
 
@@ -33,6 +34,10 @@ def create_option_parser():
     def rangespec_callback(option, opt_str, value, parser):
         setattr(parser.values, option.dest,
                 parse_range_specification(value))
+
+    def sizespec_callback(option, opt_str, value, parser):
+        setattr(parser.values, option.dest,
+                parse_size_specification(value))
 
     parser = optparse.OptionParser(usage=
             sys.modules[__name__].__doc__.strip())
@@ -72,16 +77,27 @@ def create_option_parser():
                  "Default: %default")
     parser.add_option("-o", "--output", metavar="FILE", dest="output",
             default=None, help="save the output to the given FILE")
+    parser.add_option("-s", "--size", metavar="WIDTHxHEIGHT", dest="size",
+            action="callback", callback=sizespec_callback, type="str",
+            default=None,
+            help="set the size of the figure to WIDTH x HEIGHT inches. "
+            "You may also use cm or mm if you specify it explicitly.")
     parser.add_option("-t", "--type", metavar="TYPE", dest="type",
             choices=("bar", "line", "quiver", "scatter3d", "surface", "wireframe"),
             default="line",
             help="the type of plot to draw (bar, line, quiver, scatter3d, surface "
             "or wireframe)")
+    parser.add_option("--font-size", metavar="SIZE", type=float, default=None,
+            dest="font_size", help="set the font size to SIZE")
     parser.add_option("--strip", action="store_true", dest="strip", default=False,
             help="strip leading and trailing whitespace from each line")
+    parser.add_option("--no-legend", dest="legend", default=True,
+            action="store_false", help="hide the legend from the plot.")
     parser.add_option("--title", metavar="TITLE", dest="title",
             default=None, help="set the title of the plot to TITLE. "
             "The default title is the input filename.")
+    parser.add_option("--no-title", dest="no_title", default=False,
+            action="store_true", help="show no title at all.")
     parser.add_option("--twin", dest="twin", default=False,
             action="store_true", help="use two Y axes")
     parser.add_option("--xlabel", metavar="LABEL", dest="xlabel",
@@ -117,11 +133,12 @@ def plot_file_on_figure(infile, figure, options):
     func(iterator, figure, options)
 
     # Add the title
-    if options.title is None:
-        if infile != "-":
-            figure.suptitle(infile)
-    else:
-        figure.suptitle(options.title)
+    if not options.no_title:
+        if options.title is None:
+            if infile != "-":
+                figure.suptitle(infile)
+        else:
+            figure.suptitle(options.title)
 
 
 def set_axis_ranges(axes, options):
@@ -255,7 +272,7 @@ def plot_bar_from_table_iterator(table_iterator, figure, options):
     set_axis_ranges(all_axes[0], options)
 
     # Add the legend
-    if legend_labels:
+    if options.legend and legend_labels:
         legend_obj = all_axes[0].legend(legend_handles, legend_labels)
         legend_obj.legendPatch.set_alpha(0.75)
 
@@ -335,19 +352,40 @@ def plot_line_from_table_iterator(table_iterator, figure, options):
     if options.twin:
         all_axes.append(figure.gca().twinx())
 
+    # Calculate the desired sizes factor from the figure width
+    size_scale_factor = figure.get_figwidth() / 8.0
+    marker_size = 6.0 * size_scale_factor
+    cap_size = 3.0 * size_scale_factor
+    line_width = size_scale_factor
+    kwargs = dict(markersize=marker_size, linewidth=line_width)
+
     # Plot the lines
     for axes, style, ys in izip(cycle(all_axes), cycle(line_styles), yss):
         if options.dates != "none":
-            handle = axes.plot_date(xs, ys, style)
+            handle = axes.plot_date(xs, ys, style, **kwargs)
         else:
-            handle = axes.plot(xs, ys, style)
+            handle = axes.plot(xs, ys, style, **kwargs)
         legend_handles.append(handle[0])
 
     # Plot the error bars if needed
     if errorbars is not None:
+        # First decide the frequency of markers so they don't overlap with
+        # each other
+        total_marker_width_inches = len(xs) * marker_size / 72.0
+        marker_freq = int(ceil(total_marker_width_inches * 2 / figure.get_figwidth()))
+
+        # Now plot the error bars
         for axes, style, ys, yerrs in izip(cycle(all_axes), \
                 cycle(bar_styles), yss, errorbars):
-            axes.errorbar(xs, ys, yerr=yerrs, fmt=style)
+            # Subsample xs and ys if needed -- markevery would subsample the
+            # markers only but not the error bars
+            if marker_freq > 1:
+                xs_s, ys_s = xs[::marker_freq], ys[::marker_freq]
+                yerrs_s = yerrs[::marker_freq]
+            else:
+                xs_s, ys_s, yerrs_s = xs, ys, yerrs
+            axes.errorbar(xs_s, ys_s, yerr=yerrs_s, fmt=style, capsize=cap_size,
+                    **kwargs)
 
     # Add the axis titles
     add_axis_titles(all_axes[0], options)
@@ -356,7 +394,7 @@ def plot_line_from_table_iterator(table_iterator, figure, options):
     set_axis_ranges(all_axes[0], options)
 
     # Add the legend
-    if legend_labels:
+    if options.legend and legend_labels:
         legend_obj = all_axes[0].legend(legend_handles, legend_labels)
         legend_obj.legendPatch.set_alpha(0.75)
 
@@ -509,11 +547,17 @@ def main():
     if options.fields:
         options.fields = [field-1 for field in options.fields]
 
+    if not options.size:
+        options.size = (8.0, 6.0)
+
+    if options.font_size:
+        matplotlib.rcParams.update({ 'font.size': options.font_size })
+
     if not args:
         args.extend("-")
 
     from matplotlib import pyplot as plt
-    figure = plt.figure()
+    figure = plt.figure(figsize=options.size)
 
     for infile in args:
         plot_file_on_figure(infile, figure, options)

@@ -2,6 +2,7 @@
 from __future__ import division
 
 from datetime import datetime
+import re
 
 def first(iterable):
     """Returns the first element of the iterable."""
@@ -217,6 +218,48 @@ def parse_range_specification(spec):
     underscore (``_``) or an empty string meaning 'automatic'."""
     return [None if value == "_" or value == "" else float(value)
             for value in spec.split(":", 1)]
+
+def parse_size_specification(spec):
+    """Parses a size specification used as arguments for some options
+    in ``qplot``. Size specifications contain two numbers separated
+    by an ``x``, a comma or a semicolon. Numbers are assumed to denote
+    inches unless they are followed by ``cm`` (to denote centimeters)
+    or ``mm`` (to denote millimeters).
+
+    The result is always provided in inches.
+    
+    Example::
+        
+        >>> parse_size_specification("")
+        >>> parse_size_specification("8 x 6")
+        (8.0, 6.0)
+        >>> parse_size_specification("2.54 cm; 50.8 mm")
+        (1.0, 2.0)
+    """
+    spec = spec.strip()
+    if not spec:
+        return None
+
+    parts = re.split("[x;,]", spec, maxsplit=1)
+    if not parts:
+        return None
+    if len(parts) > 2:
+        raise ValueError("Size specification must contain two numbers only")
+    if len(parts) == 1:
+        parts = parts*2
+
+    def parse_part(part):
+        part = part.strip().lower()
+        factor = 1.0
+        if part.endswith("cm"):
+            factor = 2.54
+            part = part[:-2].strip()
+        elif part.endswith("mm"):
+            factor = 25.4
+            part = part[:-2].strip()
+        return float(part) / factor
+
+    return tuple(parse_part(part) for part in parts)
 
 def sublist(l, idxs):
     return [l[i] for i in idxs]
