@@ -13,7 +13,7 @@ from swissknife.utils import lenient_float, mask_nans, open_anything, \
 
 from itertools import cycle, islice, izip, izip_longest
 from math import ceil
-from numpy import arange, array, isnan, meshgrid, zeros, NaN
+from numpy import arange, array, isnan, meshgrid, linspace, zeros, NaN
 from numpy.ma import masked_where
 
 import optparse
@@ -26,6 +26,10 @@ DEFAULT_COLORS = 'bgrcmyk'
 def create_option_parser():
     """Creates an `OptionParser` that parses the command line
     options."""
+
+    def gridspec_callback(option, opt_str, value, parser):
+        setattr(parser.values, option.dest,
+                parse_size_specification(value, allow_units=False))
 
     def indexspec_callback(option, opt_str, value, parser):
         setattr(parser.values, option.dest,
@@ -41,25 +45,27 @@ def create_option_parser():
 
     parser = optparse.OptionParser(usage=
             sys.modules[__name__].__doc__.strip())
-    parser.add_option("-d", "--delimiter", metavar="DELIM",
+
+    input_group = optparse.OptionGroup(parser, "Input settings")
+    input_group.add_option("-d", "--delimiter", metavar="DELIM",
             dest="delimiter", default="\t",
             help="use DELIM instad of TAB for field delimiter "
                  "in the input file")
-    parser.add_option("-D", "--dates", metavar="AXES",
+    input_group.add_option("-D", "--dates", metavar="AXES",
             dest="dates", choices=("none", "x"), default="none",
             help="assume that the given AXES contain dates. If AXES=none, "
                  "both the X and the Y coordinates will be treated as "
                  "numbers. If AXES=x, the X axis will be treated as a "
                  "date. Use --date-format to specify the format of the date. "
                  "Support for dates on the Y axis may be added later.")
-    parser.add_option("--date-format", metavar="FORMAT",
-            dest="date_format", default="%Y-%m-%d",
-            help="use the given FORMAT to parse dates. FORMAT is a "
-            "format string that must be accepted by datetime.strptime. "
-            "Default: %default")
-    parser.add_option("--every", metavar="N", dest="every", default=1,
-            help="use only the header and every Nth line from the input file")
-    parser.add_option("-f", "--fields", metavar="LIST",
+    input_group.add_option("-e", "--errorbars", metavar="AXES",
+            dest="errorbars", choices=("none", "y"), default="none",
+            help="use errorbars on the given AXES. If AXES=none, "
+                 "no error bars will be used. If AXES=y, every second column "
+                 "after the 2nd one (i.e. the 3rd, 5th, 7th etc) is assumed to "
+                 "be an error bar for the value in the previous column. "
+                 "Default: %default")
+    input_group.add_option("-f", "--fields", metavar="LIST",
             dest="fields", default=[], action="callback",
             type="str", callback=indexspec_callback,
             help="plot only these columns. For line plots (see -t), the "
@@ -68,54 +74,81 @@ def create_option_parser():
                  "of the error bars (if --errorbars is not none). For "
                  "3D plots, you need exactly three columns with the "
                  "X, Y and Z coordinates.")
-    parser.add_option("-e", "--errorbars", metavar="AXES",
-            dest="errorbars", choices=("none", "y"), default="none",
-            help="use errorbars on the given AXES. If AXES=none, "
-                 "no error bars will be used. If AXES=y, every second column "
-                 "after the 2nd one (i.e. the 3rd, 5th, 7th etc) is assumed to "
-                 "be an error bar for the value in the previous column. "
-                 "Default: %default")
-    parser.add_option("-o", "--output", metavar="FILE", dest="output",
+    input_group.add_option("--date-format", metavar="FORMAT",
+            dest="date_format", default="%Y-%m-%d",
+            help="use the given FORMAT to parse dates. FORMAT is a "
+            "format string that must be accepted by datetime.strptime. "
+            "Default: %default")
+    input_group.add_option("--every", metavar="N", dest="every", default=1,
+            help="use only the header and every Nth line from the input file")
+    input_group.add_option("--strip", action="store_true", dest="strip", default=False,
+            help="strip leading and trailing whitespace from each line")
+    parser.add_option_group(input_group)
+
+    output_group = optparse.OptionGroup(parser, "Output settings")
+    output_group.add_option("-o", "--output", metavar="FILE", dest="output",
             default=None, help="save the output to the given FILE")
-    parser.add_option("-s", "--size", metavar="WIDTHxHEIGHT", dest="size",
+    output_group.add_option("-s", "--size", metavar="WIDTHxHEIGHT", dest="size",
             action="callback", callback=sizespec_callback, type="str",
             default=None,
             help="set the size of the figure to WIDTH x HEIGHT inches. "
             "You may also use cm or mm if you specify it explicitly.")
-    parser.add_option("-t", "--type", metavar="TYPE", dest="type",
-            choices=("bar", "line", "quiver", "scatter3d", "surface", "wireframe"),
+    output_group.add_option("-t", "--type", metavar="TYPE", dest="type",
+            choices=("bar", "heatmap", "line", "quiver", "scatter3d", \
+                    "surface", "wireframe"),
             default="line",
-            help="the type of plot to draw (bar, line, quiver, scatter3d, surface "
-            "or wireframe)")
-    parser.add_option("--font-size", metavar="SIZE", type=float, default=None,
+            help="the type of plot to draw (bar, heatmap, line, quiver, "\
+                    "scatter3d, surface or wireframe)")
+    output_group.add_option("--font-size", metavar="SIZE", type=float, default=None,
             dest="font_size", help="set the font size to SIZE")
-    parser.add_option("--strip", action="store_true", dest="strip", default=False,
-            help="strip leading and trailing whitespace from each line")
-    parser.add_option("--no-legend", dest="legend", default=True,
+    output_group.add_option("--no-legend", dest="legend", default=True,
             action="store_false", help="hide the legend from the plot.")
-    parser.add_option("--title", metavar="TITLE", dest="title",
+    output_group.add_option("--no-title", dest="no_title", default=False,
+            action="store_true", help="show no title at all.")
+    output_group.add_option("--scale", dest="scale", default=1.0, metavar="SCALE",
+            type=float, help="multiply the marker sizes and the line widths by SCALE")
+    output_group.add_option("--title", metavar="TITLE", dest="title",
             default=None, help="set the title of the plot to TITLE. "
             "The default title is the input filename.")
-    parser.add_option("--no-title", dest="no_title", default=False,
-            action="store_true", help="show no title at all.")
-    parser.add_option("--twin", dest="twin", default=False,
-            action="store_true", help="use two Y axes")
-    parser.add_option("--xlabel", metavar="LABEL", dest="xlabel",
+    output_group.add_option("--twin", dest="twin", default=False,
+            action="store_true", help="use two Y axes if applicable")
+    parser.add_option_group(output_group)
+
+    axis_group = optparse.OptionGroup(parser, "Axis settings")
+    axis_group.add_option("--xlabel", metavar="LABEL", dest="xlabel",
             default="", help="set the label of the X axis to LABEL")
-    parser.add_option("--ylabel", metavar="LABEL", dest="ylabel",
+    axis_group.add_option("--ylabel", metavar="LABEL", dest="ylabel",
             default="", help="set the title of the Y axis to LABEL")
-    parser.add_option("--zlabel", metavar="LABEL", dest="zlabel",
+    axis_group.add_option("--zlabel", metavar="LABEL", dest="zlabel",
             default="", help="set the title of the Z axis to LABEL (3D plots only)")
-    parser.add_option("--xrange", metavar="MIN:MAX", dest="xrange",
+    axis_group.add_option("--xrange", metavar="MIN:MAX", dest="xrange",
             action="callback", callback=rangespec_callback, type="str",
             default=None, help="set the range of the X axis to MIN:MAX")
-    parser.add_option("--yrange", metavar="MIN:MAX", dest="yrange",
+    axis_group.add_option("--yrange", metavar="MIN:MAX", dest="yrange",
             action="callback", callback=rangespec_callback, type="str",
             default=None, help="set the range of the Y axis to MIN:MAX")
-    parser.add_option("--zrange", metavar="MIN:MAX", dest="zrange",
+    axis_group.add_option("--zrange", metavar="MIN:MAX", dest="zrange",
             action="callback", callback=rangespec_callback, type="str",
             default=None,
             help="set the range of the Z axis to MIN:MAX (3D plots only)")
+    parser.add_option_group(axis_group)
+
+    heatmap_group = optparse.OptionGroup(parser, "Heatmap settings")
+    heatmap_group.add_option("--colormap", metavar="COLORMAP", default=None, type=str,
+            dest="colormap", help="set the colormap to COLORMAP. Use the "\
+                    "Matplotlib colormap names here (e.g., hot, spectral).")
+    heatmap_group.add_option("--grid-size", metavar="WIDTHxHEIGHT",
+            dest="grid_size", default=(50, 50),
+            action="callback", callback=gridspec_callback, type="str",
+            help="set the size of the grid on which the heatmap is drawn "\
+                    "to WIDTHxHEIGHT. The default is 50x50.")
+    heatmap_group.add_option("--interpolate", default=None, dest="interpolate",
+            metavar="METHOD", help="use the given interpolation METHOD when "\
+                    "drawing the heatmap. See the Matplotlib API of the "\
+                    "imshow() function for more details.")
+    heatmap_group.add_option("--no-colorbar", default=True, action="store_false",
+            dest="colorbar", help="don't show colorbar on heatmap plots.")
+    parser.add_option_group(heatmap_group)
 
     return parser
 
@@ -277,6 +310,57 @@ def plot_bar_from_table_iterator(table_iterator, figure, options):
         legend_obj.legendPatch.set_alpha(0.75)
 
 
+def plot_heatmap_from_table_iterator(table_iterator, figure, options):
+    """Plots a heatmap whose X-Y coordinates and Z values come from the given
+    `table_iterator`. The plot will be drawn on `figure`."""
+
+    xs, ys, zs = [], [], []
+    for values in table_iterator:
+        # Less than three values? If so, skip this line.
+        if len(values) < 3:
+            continue
+        # Any of the values missing? If so, skip this line
+        if any(value is None for value in values):
+            continue
+        # Store the values
+        xs.append(values[0])
+        ys.append(values[1])
+        zs.append(values[2])
+
+    from matplotlib.mlab import griddata
+
+    # Create a regular grid
+    min_x, max_x = min(xs), max(xs)
+    min_y, max_y = min(ys), max(ys)
+    xi = linspace(min_x, max_x, num=int(options.grid_size[0]))
+    yi = linspace(min_y, max_y, num=int(options.grid_size[1]))
+    zi = griddata(xs, ys, zs, xi, yi)
+
+    # Show the image
+    axes = figure.gca()
+    kwds = dict(
+            cmap=options.colormap,
+            interpolation=options.interpolate,
+            extent=(min_x, max_x, min_y, max_y),
+            aspect="auto"
+    )
+    if options.zrange is not None:
+        kwds.update(vmin=options.zrange[0], vmax=options.zrange[1])
+    image = axes.imshow(zi, **kwds)
+
+    # Show the color bar
+    if options.colorbar:
+        figure.colorbar(image)
+
+    # Add the axis titles
+    add_axis_titles(axes, options)
+
+    # Set the axis ranges
+    set_axis_ranges(axes, options)
+
+    return figure
+
+
 def plot_line_from_table_iterator(table_iterator, figure, options):
     """Plots the dataset whose rows will be yielded by the given
     `table_iterator` (an instance of `TableWithHeaderIterator`).
@@ -353,7 +437,8 @@ def plot_line_from_table_iterator(table_iterator, figure, options):
         all_axes.append(figure.gca().twinx())
 
     # Calculate the desired sizes factor from the figure width
-    size_scale_factor = figure.get_figwidth() / 8.0
+    # size_scale_factor = figure.get_figwidth() / 8.0
+    size_scale_factor = options.scale
     marker_size = 6.0 * size_scale_factor
     cap_size = 3.0 * size_scale_factor
     line_width = size_scale_factor

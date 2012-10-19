@@ -219,7 +219,7 @@ def parse_range_specification(spec):
     return [None if value == "_" or value == "" else float(value)
             for value in spec.split(":", 1)]
 
-def parse_size_specification(spec):
+def parse_size_specification(spec, allow_units=True):
     """Parses a size specification used as arguments for some options
     in ``qplot``. Size specifications contain two numbers separated
     by an ``x``, a comma or a semicolon. Numbers are assumed to denote
@@ -251,12 +251,13 @@ def parse_size_specification(spec):
     def parse_part(part):
         part = part.strip().lower()
         factor = 1.0
-        if part.endswith("cm"):
-            factor = 2.54
-            part = part[:-2].strip()
-        elif part.endswith("mm"):
-            factor = 25.4
-            part = part[:-2].strip()
+        if allow_units:
+            if part.endswith("cm"):
+                factor = 2.54
+                part = part[:-2].strip()
+            elif part.endswith("mm"):
+                factor = 25.4
+                part = part[:-2].strip()
         return float(part) / factor
 
     return tuple(parse_part(part) for part in parts)
