@@ -342,7 +342,8 @@ def plot_heatmap_from_table_iterator(table_iterator, figure, options):
             cmap=options.colormap,
             interpolation=options.interpolate,
             extent=(min_x, max_x, min_y, max_y),
-            aspect="auto"
+            aspect="auto",
+            origin="lower"
     )
     if options.zrange is not None:
         kwds.update(vmin=options.zrange[0], vmax=options.zrange[1])
