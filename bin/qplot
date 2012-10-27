@@ -275,8 +275,9 @@ def plot_bar_from_table_iterator(table_iterator, figure, options):
     styles = list(colors)
 
     # Override the line styles where the header says so
-    styles = [override if override is not None else style
-            for style, override in izip_longest(styles, style_overrides[1:])]
+    for idx, override in enumerate(style_overrides[1:]):
+        if override is not None:
+            line_styles[idx] = override
 
     # Set up the list of axes we will use
     all_axes = [figure.gca()]
@@ -427,10 +428,10 @@ def plot_line_from_table_iterator(table_iterator, figure, options):
     bar_styles = [color+'o' for style in styles for color in colors]
 
     # Override the line styles where the header says so
-    line_styles = [override if override is not None else style
-            for style, override in izip_longest(line_styles, style_overrides[1:])]
-    bar_styles = [override if override is not None else style
-            for style, override in izip_longest(bar_styles, style_overrides[1:])]
+    for idx, override in enumerate(style_overrides[1:]):
+        if override is not None:
+            line_styles[idx] = override
+            bar_styles[idx] = override
 
     # Set up the list of axes we will use
     all_axes = [figure.gca()]
