@@ -121,6 +121,20 @@ def mean(items):
         return 0.0
     return sum(items) / len(items)
 
+def mean_err(items):
+    """Returns the mean and the estimate for the mean's error for the given items.
+    
+    Example::
+        
+        >>> m, err = mean_err([5, 3, 7, 1, 9])
+        >>> abs(err - 1.414213) < 1e-5
+        True
+    """
+    if not items:
+        return 0.0, 0.0
+    mean, sd = mean_sd(items)
+    return mean, sd / (len(items) ** 0.5)
+
 def mean_sd(items):
     """Returns the mean and the standard deviation of the given items.
     
