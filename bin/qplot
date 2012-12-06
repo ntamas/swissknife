@@ -13,7 +13,7 @@ from swissknife.utils import lenient_float, mask_nans, open_anything, \
 
 from itertools import cycle, islice, izip, izip_longest
 from math import ceil
-from numpy import arange, array, isnan, meshgrid, linspace, zeros, NaN
+from numpy import arange, array, isnan, meshgrid, linspace, sqrt, zeros, NaN
 from numpy.ma import masked_where
 
 import optparse
@@ -131,12 +131,26 @@ def create_option_parser():
             action="callback", callback=rangespec_callback, type="str",
             default=None,
             help="set the range of the Z axis to MIN:MAX (3D plots only)")
+    axis_group.add_option("--no-x-tick-labels", dest="show_xticklabels",
+            default=True, action="store_false",
+            help="hide the tick labels on the X axis")
+    axis_group.add_option("--no-y-tick-labels", dest="show_yticklabels",
+            default=True, action="store_false",
+            help="hide the tick labels on the Y axis")
+    axis_group.add_option("--no-z-tick-labels", dest="show_zticklabels",
+            default=True, action="store_false",
+            help="hide the tick labels on the Z axis")
     parser.add_option_group(axis_group)
 
     heatmap_group = optparse.OptionGroup(parser, "Heatmap settings")
     heatmap_group.add_option("--colormap", metavar="COLORMAP", default=None, type=str,
             dest="colormap", help="set the colormap to COLORMAP. Use the "\
                     "Matplotlib colormap names here (e.g., hot, spectral).")
+    heatmap_group.add_option("--contours", default=False, action="store_true",
+            dest="contours", help="show the contour lines on the plot")
+    heatmap_group.add_option("--contour-labels", default=False, action="store_true",
+            dest="contour_labels", help="show the contour line labels on the plot. "\
+                    "Implies --contours")
     heatmap_group.add_option("--grid-size", metavar="WIDTHxHEIGHT",
             dest="grid_size", default=(50, 50),
             action="callback", callback=gridspec_callback, type="str",
@@ -151,6 +165,18 @@ def create_option_parser():
     parser.add_option_group(heatmap_group)
 
     return parser
+
+def interpolate_to_regular_grid(xs, ys, zs, options):
+    """Interpolates irregularly spaced three-dimensional data to a regular
+    grid. The grid size is determined by `options.grid_size`."""
+    from matplotlib.mlab import griddata
+
+    min_x, max_x = min(xs), max(xs)
+    min_y, max_y = min(ys), max(ys)
+    xi = linspace(min_x, max_x, num=int(options.grid_size[0]))
+    yi = linspace(min_y, max_y, num=int(options.grid_size[1]))
+    zi = griddata(xs, ys, array(zs), xi, yi)
+    return xi, yi, zi
 
 def plot_file_on_figure(infile, figure, options):
     """Plots the dataset in the given file on the given figure."""
@@ -187,7 +213,7 @@ def set_axis_ranges(axes, options):
 
 def add_axis_titles(axes, options):
     """Adds the titles on the given axes using the options given in
-    `options."""
+    `options`."""
     # Add the axis titles
     if options.xlabel:
         axes.set_xlabel(options.xlabel)
@@ -195,6 +221,25 @@ def add_axis_titles(axes, options):
         axes.set_ylabel(options.ylabel)
     if options.zlabel and hasattr(axes, "set_zlabel"):
         axes.set_zlabel(options.zlabel)
+
+
+def set_axis_ticks(axes, options):
+    """Hides or shows the axis ticks based on the options given in
+    `options`."""
+    if not options.show_xticklabels:
+        axes.set_xticklabels([])
+    if not options.show_yticklabels:
+        axes.set_yticklabels([])
+    if not options.show_zticklabels:
+        axes.set_zticklabels([])
+
+
+def setup_axes(axes, options):
+    """Sets all the relevant axis properties using the options given
+    in `options`."""
+    add_axis_titles(axes, options)
+    set_axis_ranges(axes, options)
+    set_axis_ticks(axes, options)
 
 
 def parse_headers(headers):
@@ -299,11 +344,8 @@ def plot_bar_from_table_iterator(table_iterator, figure, options):
 
         bottoms += ys
 
-    # Add the axis titles
-    add_axis_titles(all_axes[0], options)
-
-    # Set the axis ranges
-    set_axis_ranges(all_axes[0], options)
+    # Set up the axes
+    setup_axes(all_axes[0], options)
 
     # Add the legend
     if options.legend and legend_labels:
@@ -328,14 +370,8 @@ def plot_heatmap_from_table_iterator(table_iterator, figure, options):
         ys.append(values[1])
         zs.append(values[2])
 
-    from matplotlib.mlab import griddata
-
     # Create a regular grid
-    min_x, max_x = min(xs), max(xs)
-    min_y, max_y = min(ys), max(ys)
-    xi = linspace(min_x, max_x, num=int(options.grid_size[0]))
-    yi = linspace(min_y, max_y, num=int(options.grid_size[1]))
-    zi = griddata(xs, ys, zs, xi, yi)
+    xi, yi, zi = interpolate_to_regular_grid(xs, ys, zs, options)
 
     # Show the image
     axes = figure.gca()
@@ -350,15 +386,18 @@ def plot_heatmap_from_table_iterator(table_iterator, figure, options):
         kwds.update(vmin=options.zrange[0], vmax=options.zrange[1])
     image = axes.imshow(zi, **kwds)
 
+    # Show the contour plot if needed
+    if options.contours:
+        contours = axes.contour(xi, yi, zi, colors="k")
+        if options.contour_labels:
+            axes.clabel(contours, inline=1)
+
     # Show the color bar
     if options.colorbar:
         figure.colorbar(image)
 
-    # Add the axis titles
-    add_axis_titles(axes, options)
-
-    # Set the axis ranges
-    set_axis_ranges(axes, options)
+    # Set up the axes
+    setup_axes(axes, options)
 
     return figure
 
@@ -474,11 +513,8 @@ def plot_line_from_table_iterator(table_iterator, figure, options):
             axes.errorbar(xs_s, ys_s, yerr=yerrs_s, fmt=style, capsize=cap_size,
                     **kwargs)
 
-    # Add the axis titles
-    add_axis_titles(all_axes[0], options)
-
-    # Set the axis ranges
-    set_axis_ranges(all_axes[0], options)
+    # Set up the axes
+    setup_axes(all_axes[0], options)
 
     # Add the legend
     if options.legend and legend_labels:
@@ -511,18 +547,23 @@ def plot_quiver_from_table_iterator(table_iterator, figure, options):
     # xs or ys
     us = mask_nans(us)
     vs = mask_nans(vs)
+    grads = sqrt(us*us + vs*vs)
 
-    # Get the axis
-    axis = figure.gca()
+    # Get the axes
+    axes = figure.gca()
+
+    # Plot the gradient contours
+    if options.contours:
+        xi, yi, gi = interpolate_to_regular_grid(xs, ys, grads, options)
+        contours = axes.contour(xi, yi, gi)
+        if options.contour_labels:
+            axes.clabel(contours, inline=1)
 
     # Plot the quiver plot
-    axis.quiver(xs, ys, us, vs, angles="xy", pivot="tail", color="blue")
+    axes.quiver(xs, ys, us, vs, angles="xy", pivot="tail", color="blue")
 
-    # Add the axis titles
-    add_axis_titles(axis, options)
-
-    # Set the axis ranges
-    set_axis_ranges(axis, options)
+    # Set up the axes
+    setup_axes(axes, options)
 
     return figure
 
@@ -553,11 +594,8 @@ def plot_scatter3d_from_table_iterator(table_iterator, figure, options):
     # Plot the scatterplot
     axes.scatter(xs, ys, zs)
 
-    # Add the axis titles
-    add_axis_titles(axes, options)
-
-    # Set the axis ranges
-    set_axis_ranges(axes, options)
+    # Set up the axes
+    setup_axes(axes, options)
 
     return figure
 
@@ -604,11 +642,8 @@ def plot_surface_from_table_iterator(table_iterator, figure, options, wireframe=
     else:
         axes.plot_surface(xs, ys, zs, rstride=1, cstride=1, cmap=cm.jet)
 
-    # Add the axis titles
-    add_axis_titles(axes, options)
-
-    # Set the axis ranges
-    set_axis_ranges(axes, options)
+    # Set up the axes
+    setup_axes(axes, options)
 
     return figure
 
