@@ -121,6 +121,21 @@ def mean(items):
         return 0.0
     return sum(items) / len(items)
 
+def mean_95ci(items):
+    """Returns the mean and the estimate for the width of the 95% confidence
+    interval of the mean assuming a normal distribution.
+    
+    Example::
+        
+        >>> m, ci_width = mean_95ci([5, 3, 7, 1, 9])
+        >>> abs(ci_width - 5.543613) < 1e-5
+        True
+    """
+    if not items:
+        return 0.0, 0.0
+    mean, sd = mean_sd(items)
+    return mean, sd / (len(items) ** 0.5) * 3.919927969
+
 def mean_err(items):
     """Returns the mean and the estimate for the mean's error for the given items.
     
