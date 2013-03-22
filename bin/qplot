@@ -111,7 +111,9 @@ def create_option_parser():
             default=None, help="set the title of the plot to TITLE. "
             "The default title is the input filename.")
     output_group.add_option("--twin", dest="twin", default=False,
-            action="store_true", help="use two Y axes if applicable")
+            action="store_true", help="use two Y axes if applicable. Odd data "
+            "columns will be printed on the first Y axis, even data columns "
+            "will be printed on the second Y axis.")
     parser.add_option_group(output_group)
 
     axis_group = optparse.OptionGroup(parser, "Axis settings")
@@ -119,6 +121,9 @@ def create_option_parser():
             default="", help="set the label of the X axis to LABEL")
     axis_group.add_option("--ylabel", metavar="LABEL", dest="ylabel",
             default="", help="set the title of the Y axis to LABEL")
+    axis_group.add_option("--y2label", metavar="LABEL", dest="y2label",
+            default="", help="set the title of the second Y axis to LABEL "\
+                    "(twin axes only)")
     axis_group.add_option("--zlabel", metavar="LABEL", dest="zlabel",
             default="", help="set the title of the Z axis to LABEL (3D plots only)")
     axis_group.add_option("--xrange", metavar="MIN:MAX", dest="xrange",
@@ -127,6 +132,10 @@ def create_option_parser():
     axis_group.add_option("--yrange", metavar="MIN:MAX", dest="yrange",
             action="callback", callback=rangespec_callback, type="str",
             default=None, help="set the range of the Y axis to MIN:MAX")
+    axis_group.add_option("--y2range", metavar="MIN:MAX", dest="y2range",
+            action="callback", callback=rangespec_callback, type="str",
+            default=None, help="set the range of the second Y axis to MIN:MAX "\
+                    "(twin axes only)")
     axis_group.add_option("--zrange", metavar="MIN:MAX", dest="zrange",
             action="callback", callback=rangespec_callback, type="str",
             default=None,
@@ -137,6 +146,9 @@ def create_option_parser():
     axis_group.add_option("--no-y-tick-labels", dest="show_yticklabels",
             default=True, action="store_false",
             help="hide the tick labels on the Y axis")
+    axis_group.add_option("--no-y2-tick-labels", dest="show_y2ticklabels",
+            default=True, action="store_false",
+            help="hide the tick labels on the second Y axis (twin axes only)")
     axis_group.add_option("--no-z-tick-labels", dest="show_zticklabels",
             default=True, action="store_false",
             help="hide the tick labels on the Z axis")
@@ -200,46 +212,58 @@ def plot_file_on_figure(infile, figure, options):
             figure.suptitle(options.title)
 
 
-def set_axis_ranges(axes, options):
-    """Sets the ranges of the axes using the options given in
-    `options`."""
+def set_axis_ranges(primary_axis, secondary_axis, options):
+    """Sets the ranges of the primary and secondary axes using the options
+    given in `options`."""
     if options.xrange:
-        axes.set_xlim(*options.xrange)
+        primary_axis.set_xlim(*options.xrange)
     if options.yrange:
-        axes.set_ylim(*options.yrange)
-    if options.zrange and hasattr(axes, "set_zlim"):
-        axes.set_zlim(*options.zrange)
+        primary_axis.set_ylim(*options.yrange)
+    if options.zrange and hasattr(primary_axis, "set_zlim"):
+        primary_axis.set_zlim(*options.zrange)
+    if secondary_axis and options.y2range:
+        secondary_axis.set_ylim(*options.y2range)
 
 
-def add_axis_titles(axes, options):
-    """Adds the titles on the given axes using the options given in
-    `options`."""
+def add_axis_titles(primary_axis, secondary_axis, options):
+    """Adds the titles on the given primary and secondary axes using the
+    options given in `options`."""
     # Add the axis titles
     if options.xlabel:
-        axes.set_xlabel(options.xlabel)
+        primary_axis.set_xlabel(options.xlabel)
     if options.ylabel:
-        axes.set_ylabel(options.ylabel)
-    if options.zlabel and hasattr(axes, "set_zlabel"):
-        axes.set_zlabel(options.zlabel)
+        primary_axis.set_ylabel(options.ylabel)
+    if options.zlabel and hasattr(primary_axis, "set_zlabel"):
+        primary_axis.set_zlabel(options.zlabel)
+    if secondary_axis and options.y2label:
+        secondary_axis.set_ylabel(options.y2label)
 
 
-def set_axis_ticks(axes, options):
+def set_axis_ticks(primary_axis, secondary_axis, options):
     """Hides or shows the axis ticks based on the options given in
     `options`."""
     if not options.show_xticklabels:
-        axes.set_xticklabels([])
+        primary_axis.set_xticklabels([])
     if not options.show_yticklabels:
-        axes.set_yticklabels([])
+        primary_axis.set_yticklabels([])
     if not options.show_zticklabels:
-        axes.set_zticklabels([])
+        primary_axis.set_zticklabels([])
+    if secondary_axis and not options.show_y2ticklabels:
+        secondary_axis.set_yticklabels([])
 
 
 def setup_axes(axes, options):
     """Sets all the relevant axis properties using the options given
     in `options`."""
-    add_axis_titles(axes, options)
-    set_axis_ranges(axes, options)
-    set_axis_ticks(axes, options)
+    if hasattr(axes, "__len__"):
+        primary_axis = axes[0]
+        secondary_axis = axes[1] if len(axes) > 1 else None
+    else:
+        primary_axis, secondary_axis = axes, None
+
+    add_axis_titles(primary_axis, secondary_axis, options)
+    set_axis_ranges(primary_axis, secondary_axis, options)
+    set_axis_ticks(primary_axis, secondary_axis, options)
 
 
 def parse_headers(headers):
@@ -345,7 +369,7 @@ def plot_bar_from_table_iterator(table_iterator, figure, options):
         bottoms += ys
 
     # Set up the axes
-    setup_axes(all_axes[0], options)
+    setup_axes(all_axes, options)
 
     # Add the legend
     if options.legend and legend_labels:
@@ -514,7 +538,7 @@ def plot_line_from_table_iterator(table_iterator, figure, options):
                     **kwargs)
 
     # Set up the axes
-    setup_axes(all_axes[0], options)
+    setup_axes(all_axes, options)
 
     # Add the legend
     if options.legend and legend_labels:
