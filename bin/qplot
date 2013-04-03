@@ -101,7 +101,11 @@ def create_option_parser():
                     "scatter3d, surface or wireframe)")
     output_group.add_option("--font-size", metavar="SIZE", type=float, default=None,
             dest="font_size", help="set the font size to SIZE")
-    output_group.add_option("--no-legend", dest="legend", default=True,
+    output_group.add_option("--legend", dest="legend", default="best",
+            metavar="LOCATION", help="show the legend at the given LOCATION. "
+            "Default is 'best'. See the legend location constants in "
+            "the legend() function of Matplotlib for more details.")
+    output_group.add_option("--no-legend", dest="legend",
             action="store_false", help="hide the legend from the plot.")
     output_group.add_option("--no-title", dest="no_title", default=False,
             action="store_true", help="show no title at all.")
@@ -140,6 +144,22 @@ def create_option_parser():
             action="callback", callback=rangespec_callback, type="str",
             default=None,
             help="set the range of the Z axis to MIN:MAX (3D plots only)")
+    axis_group.add_option("--xformat", metavar="FORMAT", dest="xformat",
+            default="numeric", choices=("numeric", "percentage"),
+            help="use the given FORMAT for the X axis labels (numeric or "\
+                    "percentage)")
+    axis_group.add_option("--yformat", metavar="FORMAT", dest="yformat",
+            default="numeric", choices=("numeric", "percentage"),
+            help="use the given FORMAT for the Y axis labels (numeric or "\
+                    "percentage)")
+    axis_group.add_option("--y2format", metavar="FORMAT", dest="y2format",
+            default="numeric", choices=("numeric", "percentage"),
+            help="use the given FORMAT for the secondary Y axis labels "\
+                    "(numeric or percentage; twin axes only)")
+    axis_group.add_option("--zformat", metavar="FORMAT", dest="zformat",
+            default="numeric", choices=("numeric", "percentage"),
+            help="use the given FORMAT for the X axis labels (numeric or "\
+                    "percentage; 3D plots only)")
     axis_group.add_option("--no-x-tick-labels", dest="show_xticklabels",
             default=True, action="store_false",
             help="hide the tick labels on the X axis")
@@ -212,44 +232,67 @@ def plot_file_on_figure(infile, figure, options):
             figure.suptitle(options.title)
 
 
-def set_axis_ranges(primary_axis, secondary_axis, options):
+def set_axis_ranges(primary_axes, secondary_axes, options):
     """Sets the ranges of the primary and secondary axes using the options
     given in `options`."""
     if options.xrange:
-        primary_axis.set_xlim(*options.xrange)
+        primary_axes.set_xlim(*options.xrange)
     if options.yrange:
-        primary_axis.set_ylim(*options.yrange)
-    if options.zrange and hasattr(primary_axis, "set_zlim"):
-        primary_axis.set_zlim(*options.zrange)
-    if secondary_axis and options.y2range:
-        secondary_axis.set_ylim(*options.y2range)
+        primary_axes.set_ylim(*options.yrange)
+    if options.zrange and hasattr(primary_axes, "set_zlim"):
+        primary_axes.set_zlim(*options.zrange)
+    if secondary_axes and options.y2range:
+        secondary_axes.set_ylim(*options.y2range)
 
 
-def add_axis_titles(primary_axis, secondary_axis, options):
+def add_axis_titles(primary_axes, secondary_axes, options):
     """Adds the titles on the given primary and secondary axes using the
     options given in `options`."""
     # Add the axis titles
     if options.xlabel:
-        primary_axis.set_xlabel(options.xlabel)
+        primary_axes.set_xlabel(options.xlabel)
     if options.ylabel:
-        primary_axis.set_ylabel(options.ylabel)
-    if options.zlabel and hasattr(primary_axis, "set_zlabel"):
-        primary_axis.set_zlabel(options.zlabel)
-    if secondary_axis and options.y2label:
-        secondary_axis.set_ylabel(options.y2label)
+        primary_axes.set_ylabel(options.ylabel)
+    if options.zlabel and hasattr(primary_axes, "set_zlabel"):
+        primary_axes.set_zlabel(options.zlabel)
+    if secondary_axes and options.y2label:
+        secondary_axes.set_ylabel(options.y2label)
 
 
-def set_axis_ticks(primary_axis, secondary_axis, options):
+def set_axis_formatters(primary_axes, secondary_axes, options):
+    """Sets the tick label formatters for the given primary and secondary
+    axes using the options given in `options`."""
+
+    from matplotlib.ticker import FuncFormatter, ScalarFormatter
+
+    def percent_format(x, _):
+        return "%d%%" % int(round(x * 100))
+
+    formatters = dict(
+            numeric=ScalarFormatter(),
+            percentage=FuncFormatter(percent_format)
+    )
+
+    if options.xformat:
+        primary_axes.xaxis.set_major_formatter(formatters[options.xformat])
+    if options.yformat:
+        primary_axes.yaxis.set_major_formatter(formatters[options.yformat])
+    if options.zformat and hasattr(primary_axes, "zaxis"):
+        primary_axes.zaxis.set_major_formatter(formatters[options.zformat])
+    if secondary_axes and options.y2format:
+        secondary_axes.yaxis.set_major_formatter(formatters[options.y2format])
+    
+def set_axis_ticks(primary_axes, secondary_axes, options):
     """Hides or shows the axis ticks based on the options given in
     `options`."""
     if not options.show_xticklabels:
-        primary_axis.set_xticklabels([])
+        primary_axes.set_xticklabels([])
     if not options.show_yticklabels:
-        primary_axis.set_yticklabels([])
+        primary_axes.set_yticklabels([])
     if not options.show_zticklabels:
-        primary_axis.set_zticklabels([])
-    if secondary_axis and not options.show_y2ticklabels:
-        secondary_axis.set_yticklabels([])
+        primary_axes.set_zticklabels([])
+    if secondary_axes and not options.show_y2ticklabels:
+        secondary_axes.set_yticklabels([])
 
 
 def setup_axes(axes, options):
@@ -262,6 +305,7 @@ def setup_axes(axes, options):
         primary_axis, secondary_axis = axes, None
 
     add_axis_titles(primary_axis, secondary_axis, options)
+    set_axis_formatters(primary_axis, secondary_axis, options)
     set_axis_ranges(primary_axis, secondary_axis, options)
     set_axis_ticks(primary_axis, secondary_axis, options)
 
@@ -373,7 +417,7 @@ def plot_bar_from_table_iterator(table_iterator, figure, options):
 
     # Add the legend
     if options.legend and legend_labels:
-        legend_obj = all_axes[0].legend(legend_handles, legend_labels)
+        legend_obj = all_axes[0].legend(legend_handles, legend_labels, loc=options.legend)
         legend_obj.legendPatch.set_alpha(0.75)
 
 
@@ -402,7 +446,7 @@ def plot_heatmap_from_table_iterator(table_iterator, figure, options):
     kwds = dict(
             cmap=options.colormap,
             interpolation=options.interpolate,
-            extent=(min_x, max_x, min_y, max_y),
+            extent=(xi[0], xi[-1], yi[0], yi[-1]),
             aspect="auto",
             origin="lower"
     )
@@ -542,7 +586,7 @@ def plot_line_from_table_iterator(table_iterator, figure, options):
 
     # Add the legend
     if options.legend and legend_labels:
-        legend_obj = all_axes[0].legend(legend_handles, legend_labels)
+        legend_obj = all_axes[0].legend(legend_handles, legend_labels, loc=options.legend)
         legend_obj.legendPatch.set_alpha(0.75)
 
 
@@ -698,6 +742,11 @@ def main():
 
     if options.font_size:
         matplotlib.rcParams.update({ 'font.size': options.font_size })
+
+    if options.legend:
+        options.legend = options.legend.lower().replace("_", " ")
+        if options.legend == "none" or options.legend == "hide":
+            options.legend = None
 
     if not args:
         args.extend("-")
