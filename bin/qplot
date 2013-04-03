@@ -316,8 +316,37 @@ def setup_legend(all_axes, legend_handles, legend_labels, options):
     if not options.legend or not legend_labels:
         return
 
-    legend_obj = all_axes[-1].legend(legend_handles, legend_labels, loc=options.legend)
+    legend_axis = all_axes[-1]
+
+    if options.twin and options.legend == "best":
+        # We have two Y axes. The problem is that the "best placement"
+        # algorithm in Matplotlib takes into account only the contents
+        # of the axis on which the legend is placed. We fix that here.
+        # This is terrible monkey-patching but we cannot do any better.
+        from matplotlib.legend import Legend
+
+        tmp_legend = all_axes[0].legend(legend_handles, legend_labels)
+        tmp_data = tmp_legend._auto_legend_data()
+        all_axes[0].legend_ = None
+        del tmp_legend
+
+        old_func = Legend._auto_legend_data
+        def patched_auto_legend_data(self):
+            super_data = old_func(self)
+            for idx, item in enumerate(super_data):
+                item += tmp_data[idx]
+            return super_data
+
+        Legend._auto_legend_data = patched_auto_legend_data
+    else:
+        old_func = None
+
+    legend_obj = legend_axis.legend(legend_handles, legend_labels,
+            loc=options.legend)
     legend_obj.get_frame().set_alpha(0.75)
+
+    # if old_func is not None:
+    #     Legend._auto_legend_data = old_func
 
 
 def parse_headers(headers):
