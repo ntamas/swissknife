@@ -310,6 +310,16 @@ def setup_axes(axes, options):
     set_axis_ticks(primary_axis, secondary_axis, options)
 
 
+def setup_legend(all_axes, legend_handles, legend_labels, options):
+    """Sets all the relevant legend properties using the options given
+    in `options`."""
+    if not options.legend or not legend_labels:
+        return
+
+    legend_obj = all_axes[-1].legend(legend_handles, legend_labels, loc=options.legend)
+    legend_obj.get_frame().set_alpha(0.75)
+
+
 def parse_headers(headers):
     """Iterates over the headers of the input file and tries to
     extract style specifications out of them.
@@ -416,9 +426,7 @@ def plot_bar_from_table_iterator(table_iterator, figure, options):
     setup_axes(all_axes, options)
 
     # Add the legend
-    if options.legend and legend_labels:
-        legend_obj = all_axes[0].legend(legend_handles, legend_labels, loc=options.legend)
-        legend_obj.legendPatch.set_alpha(0.75)
+    setup_legend(all_axes, legend_handles, legend_labels, options)
 
 
 def plot_heatmap_from_table_iterator(table_iterator, figure, options):
@@ -585,9 +593,7 @@ def plot_line_from_table_iterator(table_iterator, figure, options):
     setup_axes(all_axes, options)
 
     # Add the legend
-    if options.legend and legend_labels:
-        legend_obj = all_axes[0].legend(legend_handles, legend_labels, loc=options.legend)
-        legend_obj.legendPatch.set_alpha(0.75)
+    setup_legend(all_axes, legend_handles, legend_labels, options)
 
 
 def plot_quiver_from_table_iterator(table_iterator, figure, options):
