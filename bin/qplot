@@ -259,29 +259,38 @@ def add_axis_titles(primary_axes, secondary_axes, options):
         secondary_axes.set_ylabel(options.y2label)
 
 
+def get_axis_formatter_for_format(format):
+    """Returns an axis formatter suitable for the given ``format``."""
+    from matplotlib.ticker import FuncFormatter, ScalarFormatter
+
+    if format == "numeric":
+        return ScalarFormatter()
+    elif format == "percentage":
+        def percent_format(x, _):
+            return "%d%%" % int(round(x * 100))
+        return FuncFormatter(percent_format)
+    else:
+        raise KeyError("no such axis format: %s" % format)
+
+
 def set_axis_formatters(primary_axes, secondary_axes, options):
     """Sets the tick label formatters for the given primary and secondary
     axes using the options given in `options`."""
 
-    from matplotlib.ticker import FuncFormatter, ScalarFormatter
-
-    def percent_format(x, _):
-        return "%d%%" % int(round(x * 100))
-
-    formatters = dict(
-            numeric=ScalarFormatter(),
-            percentage=FuncFormatter(percent_format)
-    )
-
     if options.xformat:
-        primary_axes.xaxis.set_major_formatter(formatters[options.xformat])
+        formatter = get_axis_formatter_for_format(options.xformat)
+        primary_axes.xaxis.set_major_formatter(formatter)
     if options.yformat:
-        primary_axes.yaxis.set_major_formatter(formatters[options.yformat])
+        formatter = get_axis_formatter_for_format(options.yformat)
+        primary_axes.yaxis.set_major_formatter(formatter)
     if options.zformat and hasattr(primary_axes, "zaxis"):
-        primary_axes.zaxis.set_major_formatter(formatters[options.zformat])
+        formatter = get_axis_formatter_for_format(options.zformat)
+        primary_axes.zaxis.set_major_formatter(formatter)
     if secondary_axes and options.y2format:
-        secondary_axes.yaxis.set_major_formatter(formatters[options.y2format])
-    
+        formatter = get_axis_formatter_for_format(options.y2format)
+        secondary_axes.yaxis.set_major_formatter(formatter)
+
+
 def set_axis_ticks(primary_axes, secondary_axes, options):
     """Hides or shows the axis ticks based on the options given in
     `options`."""
@@ -499,7 +508,8 @@ def plot_heatmap_from_table_iterator(table_iterator, figure, options):
 
     # Show the color bar
     if options.colorbar:
-        figure.colorbar(image)
+        formatter = get_axis_formatter_for_format(options.zformat)
+        colorbar = figure.colorbar(image, format=formatter)
 
     # Set up the axes
     setup_axes(axes, options)
