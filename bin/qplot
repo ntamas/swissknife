@@ -15,6 +15,7 @@ from itertools import cycle, islice, izip, izip_longest
 from math import ceil
 from numpy import arange, array, isnan, meshgrid, linspace, sqrt, zeros, NaN
 from numpy.ma import masked_where
+from warnings import warn
 
 import optparse
 import re
@@ -203,11 +204,39 @@ def interpolate_to_regular_grid(xs, ys, zs, options):
     grid. The grid size is determined by `options.grid_size`."""
     from matplotlib.mlab import griddata
 
+    grid_size = options.grid_size
     min_x, max_x = min(xs), max(xs)
     min_y, max_y = min(ys), max(ys)
-    xi = linspace(min_x, max_x, num=int(options.grid_size[0]))
-    yi = linspace(min_y, max_y, num=int(options.grid_size[1]))
-    zi = griddata(xs, ys, array(zs), xi, yi)
+    tries = 3
+    zi = None
+
+    while True:
+        xi = linspace(min_x, max_x, num=int(grid_size[0]))
+        yi = linspace(min_y, max_y, num=int(grid_size[1]))
+        try:
+            zi = griddata(xs, ys, array(zs), xi, yi, interp="linear")
+            break
+        except ValueError as err:
+            if err.message and err.message.startswith(\
+                    "output grid must have constant spacing"):
+                # We do have constant spacing but it is inaccurate. Try
+                # doubling the grid size
+                grid_size = grid_size[0]*2, grid_size[1]*2
+                tries -= 1
+                if tries <= 0:
+                    # Give up
+                    break
+
+    if zi is None:
+        # Okay, we gave up, let's just use nearest neighbor
+        # interpolation with the original grid size
+        xi = linspace(min_x, max_x, num=int(options.grid_size[0]))
+        yi = linspace(min_y, max_y, num=int(options.grid_size[1]))
+        zi = griddata(xs, ys, array(zs), xi, yi, interp="nn")
+        warn("Using nearest neighbor interpolation instead of "\
+                "linear; watch out for artifacts if the X and "\
+                "Y ranges are wildly different")
+
     return xi, yi, zi
 
 def plot_file_on_figure(infile, figure, options):
