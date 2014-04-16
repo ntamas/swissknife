@@ -23,6 +23,8 @@ import sys
 
 
 DEFAULT_COLORS = 'bgrcmyk'
+DEFAULT_LINE_STYLES = '- -- -. :'.split()
+DEFAULT_MARKERS = 'os^v<>+*dph8'
 
 def create_option_parser():
     """Creates an `OptionParser` that parses the command line
@@ -95,11 +97,11 @@ def create_option_parser():
             help="set the size of the figure to WIDTH x HEIGHT inches. "
             "You may also use cm or mm if you specify it explicitly.")
     output_group.add_option("-t", "--type", metavar="TYPE", dest="type",
-            choices=("bar", "heatmap", "line", "quiver", "scatter3d", \
+            choices=("bar", "heatmap", "line", "quiver", "scatter", "scatter3d", \
                     "surface", "wireframe"),
             default="line",
             help="the type of plot to draw (bar, heatmap, line, quiver, "\
-                    "scatter3d, surface or wireframe)")
+                    "scatter, scatter3d, surface or wireframe)")
     output_group.add_option("--font-size", metavar="SIZE", type=float, default=None,
             dest="font_size", help="set the font size to SIZE")
     output_group.add_option("--legend", dest="legend", default="best",
@@ -467,7 +469,7 @@ def plot_bar_from_table_iterator(table_iterator, figure, options):
     # Override the line styles where the header says so
     for idx, override in enumerate(style_overrides[1:]):
         if override is not None:
-            line_styles[idx] = override
+            styles[idx] = override
 
     # Set up the list of axes we will use
     all_axes = [figure.gca()]
@@ -606,7 +608,7 @@ def plot_line_from_table_iterator(table_iterator, figure, options):
 
     # Set up the line styles to be used
     colors = DEFAULT_COLORS
-    styles = '- -- -. :'.split()
+    styles = DEFAULT_LINE_STYLES
     line_styles = [color+style for style in styles for color in colors]
     bar_styles = [color+'o' for style in styles for color in colors]
 
@@ -622,7 +624,6 @@ def plot_line_from_table_iterator(table_iterator, figure, options):
         all_axes.append(figure.gca().twinx())
 
     # Calculate the desired sizes factor from the figure width
-    # size_scale_factor = figure.get_figwidth() / 8.0
     size_scale_factor = options.scale
     marker_size = 6.0 * size_scale_factor
     cap_size = 3.0 * size_scale_factor
@@ -706,6 +707,91 @@ def plot_quiver_from_table_iterator(table_iterator, figure, options):
 
     # Set up the axes
     setup_axes(axes, options)
+
+    return figure
+
+
+def plot_scatter_from_table_iterator(table_iterator, figure, options):
+    """Plots a 2D scatterplot whose points come from the given `table_iterator`.
+    The plot will be drawn on `figure`."""
+
+    xss, yss = [], []
+    for values in table_iterator:
+        # Odd number of columns? If so, skip this line.
+        if len(values) % 2 != 0:
+            continue
+
+        # Not enough columns? Add the missing ones
+        if len(values) < len(xss) * 2:
+            values.extend([None] * (len(xss)*2-len(values)))
+
+        # Values come in X-Y pairs. When X is None, we skip the
+        # corresponding Y value. Similarly, when Y is None, we skip
+        # the corresponding X value. First, we iterate over values
+        # and make sure that Y is None iff X is None
+        for index in xrange(len(values)):
+            if values[index] is None:
+                values[index ^ 1] = None
+
+        # Now we can store the X-Y pairs, skipping None values
+        if not xss:
+            # First row, must extend xss and yss with columns
+            xss = [[x] if x is not None else [] for x in islice(values, 0, None, 2)]
+            yss = [[y] if y is not None else [] for y in islice(values, 1, None, 2)]
+        else:
+            for xs, x in izip(xss, islice(values, 0, None, 2)):
+                if x is not None:
+                    xs.append(x)
+            for ys, y in izip(yss, islice(values, 1, None, 2)):
+                if y is not None:
+                    ys.append(y)
+
+    headers, style_overrides = parse_headers(table_iterator.headers)
+
+    # Calculate the legend labels
+    legend_handles, legend_labels = [], []
+    if yss and headers is not None:
+        legend_labels = headers[::2]
+
+    # Strip suffixes and prefixes from the end of the legend labels
+    new_labels = []
+    suffixes = ["_x", " x", "(x)"]
+    prefixes = ["x_", "x "]
+    for label in legend_labels:
+        for prefix in prefixes:
+            if label.startswith(prefix):
+                label = label[len(prefix):]
+                break
+        for suffix in suffixes:
+            if label.endswith(suffix):
+                label = label[:-len(suffix)]
+                break
+        new_labels.append(label.strip())
+    legend_labels = new_labels
+
+    # Set up the marker styles to be used
+    colors = DEFAULT_COLORS
+    styles = list(colors)
+
+    # Override the line styles where the header says so
+    for idx, override in enumerate(style_overrides[1:]):
+        if override is not None:
+            styles[idx] = override
+
+    # Create the axes
+    axes = figure.gca()
+    all_axes = [axes]
+
+    # Plot the scatterplot
+    for xs, ys, style in izip(xss, yss, cycle(styles)):
+        handle = axes.scatter(xs, ys, c=style)
+        legend_handles.append(handle)
+
+    # Set up the axes
+    setup_axes(all_axes, options)
+
+    # Add the legend
+    setup_legend(all_axes, legend_handles, legend_labels, options)
 
     return figure
 
