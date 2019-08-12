@@ -1,5 +1,7 @@
 
 from datetime import datetime
+from io import IOBase
+
 import re
 
 def first(iterable):
@@ -191,7 +193,7 @@ def open_anything(fname, *args, **kwds):
     other argument given, the remote URL will be opened for reading.
     A single dash in place of the filename means the standard input.
     """
-    if isinstance(fname, file):
+    if isinstance(fname, IOBase):
         infile = fname
     elif fname == "-" or fname is None:
         import sys
