@@ -11,14 +11,14 @@ contains the mean/sum/variance/etc of all the N elements in row i/column j
 in the N input files.
 """
 
-from __future__ import print_function
+
 
 from swissknife.error import AppError
 from swissknife.utils import first, flatten, last, lenient_float, mean, \
         mean_95ci, mean_err, mean_sd, median, only_numbers, open_anything, \
         parse_index_specification, sublist
 
-from itertools import cycle, islice, izip
+from itertools import cycle, islice
 import optparse
 import sys
 
@@ -142,14 +142,14 @@ def process_files_column_single(fp, options, first_file=False):
         if len(result) < len(line):
             diff = len(line) - len(result)
             if not result:
-                result = [[] for _ in xrange(diff)]
+                result = [[] for _ in range(diff)]
             else:
-                result.extend([0.0] for _ in xrange(diff))
-        for item, l in izip(line, result):
+                result.extend([0.0] for _ in range(diff))
+        for item, l in zip(line, result):
             l.append(item)
 
     # Print the output
-    print(join(map(str, flatten(func(items) for items in result))))
+    print(join(list(map(str, flatten(func(items) for items in result)))))
 
 def process_files_multiple(infiles, options):
     """Processes the given files in ``multiple`` mode.
@@ -172,7 +172,7 @@ def process_files_multiple(infiles, options):
     # If not, we are still processing the headers.
     data_started = False
 
-    for lines in izip(*[open_anything(f) for f in infiles]):
+    for lines in zip(*[open_anything(f) for f in infiles]):
         # Split the input line
         lines = [line.strip().split(delim) for line in lines]
 

@@ -1,3 +1,5 @@
 *.pyc
 *.swp
 swissknife.egg-info/
+build/
+dist/

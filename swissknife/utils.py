@@ -1,6 +1,4 @@
 
-from __future__ import division
-
 from datetime import datetime
 import re
 
@@ -30,8 +28,8 @@ def flatten(*args):
         return []
     if len(args) > 1:
         return flatten(list(args))
-    if hasattr(args[0], "__iter__") and not isinstance(args[0], basestring):
-        return sum(map(flatten, args[0]), [])
+    if hasattr(args[0], "__iter__") and not isinstance(args[0], str):
+        return sum(list(map(flatten, args[0])), [])
     return list(args)
 
 class TableWithHeaderIterator(object):
@@ -200,8 +198,8 @@ def open_anything(fname, *args, **kwds):
         infile = sys.stdin
     elif (fname.startswith("http://") or fname.startswith("ftp://") or \
          fname.startswith("https://")) and not kwds and not args:
-        import urllib2
-        infile = urllib2.urlopen(fname)
+        import urllib.request, urllib.error, urllib.parse
+        infile = urllib.request.urlopen(fname)
     elif fname[-4:] == ".bz2":
         import bz2
         infile = bz2.BZ2File(fname, *args, **kwds)
@@ -221,7 +219,7 @@ def parse_date(date_string, format="%Y-%m-%d", default=None, ordinal=False):
     `default`. `format` specifies the date format to use."""
     try:
         result = datetime.strptime(date_string, format)
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         return default
     if ordinal:
         return result.toordinal()
@@ -234,8 +232,8 @@ def parse_index_specification(spec):
     for part in spec.split(","):
         part = part.strip()
         if "-" in part:
-            lo, hi = map(int, part.split("-", 1))
-            result.extend(xrange(lo, hi+1))
+            lo, hi = list(map(int, part.split("-", 1)))
+            result.extend(range(lo, hi+1))
         else:
             result.append(int(part))
     return result

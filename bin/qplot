@@ -11,7 +11,7 @@ from swissknife.utils import lenient_float, mask_nans, open_anything, \
         parse_date, parse_index_specification, parse_range_specification, \
         parse_size_specification, TableWithHeaderIterator
 
-from itertools import cycle, islice, izip, izip_longest
+from itertools import cycle, islice, zip_longest
 from math import ceil
 from numpy import arange, array, isnan, meshgrid, linspace, sqrt, zeros, NaN
 from numpy.ma import masked_where
@@ -436,7 +436,7 @@ def plot_bar_from_table_iterator(table_iterator, figure, options):
             # First row, must extend yss with columns
             yss = [[y] for y in values]
         else:
-            for ys, y in izip(yss, values):
+            for ys, y in zip(yss, values):
                 ys.append(y)
 
     headers, style_overrides = parse_headers(table_iterator.headers)
@@ -480,7 +480,7 @@ def plot_bar_from_table_iterator(table_iterator, figure, options):
     xs = arange(0, len(yss[0]))
     bottoms = zeros(len(yss[0]))
     i = 0
-    for axes, style, ys in izip(cycle(all_axes), cycle(styles), yss):
+    for axes, style, ys in zip(cycle(all_axes), cycle(styles), yss):
         params = dict(left=xs, height=ys, bottom=bottoms, color=style)
         if errorbars is not None:
             params["yerr"] = errorbars[i]
@@ -571,7 +571,7 @@ def plot_line_from_table_iterator(table_iterator, figure, options):
             # First row, must extend yss with columns
             yss = [[y] for y in islice(values, 1, None)]
         else:
-            for ys, y in izip(yss, islice(values, 1, None)):
+            for ys, y in zip(yss, islice(values, 1, None)):
                 ys.append(y)
 
     headers, style_overrides = parse_headers(table_iterator.headers)
@@ -631,7 +631,7 @@ def plot_line_from_table_iterator(table_iterator, figure, options):
     kwargs = dict(markersize=marker_size, linewidth=line_width)
 
     # Plot the lines
-    for axes, style, ys in izip(cycle(all_axes), cycle(line_styles), yss):
+    for axes, style, ys in zip(cycle(all_axes), cycle(line_styles), yss):
         if options.dates != "none":
             handle = axes.plot_date(xs, ys, style, **kwargs)
         else:
@@ -646,7 +646,7 @@ def plot_line_from_table_iterator(table_iterator, figure, options):
         marker_freq = int(ceil(total_marker_width_inches * 2 / figure.get_figwidth()))
 
         # Now plot the error bars
-        for axes, style, ys, yerrs in izip(cycle(all_axes), \
+        for axes, style, ys, yerrs in zip(cycle(all_axes), \
                 cycle(bar_styles), yss, errorbars):
             # Subsample xs and ys if needed -- markevery would subsample the
             # markers only but not the error bars
@@ -729,7 +729,7 @@ def plot_scatter_from_table_iterator(table_iterator, figure, options):
         # corresponding Y value. Similarly, when Y is None, we skip
         # the corresponding X value. First, we iterate over values
         # and make sure that Y is None iff X is None
-        for index in xrange(len(values)):
+        for index in range(len(values)):
             if values[index] is None:
                 values[index ^ 1] = None
 
@@ -739,10 +739,10 @@ def plot_scatter_from_table_iterator(table_iterator, figure, options):
             xss = [[x] if x is not None else [] for x in islice(values, 0, None, 2)]
             yss = [[y] if y is not None else [] for y in islice(values, 1, None, 2)]
         else:
-            for xs, x in izip(xss, islice(values, 0, None, 2)):
+            for xs, x in zip(xss, islice(values, 0, None, 2)):
                 if x is not None:
                     xs.append(x)
-            for ys, y in izip(yss, islice(values, 1, None, 2)):
+            for ys, y in zip(yss, islice(values, 1, None, 2)):
                 if y is not None:
                     ys.append(y)
 
@@ -783,7 +783,7 @@ def plot_scatter_from_table_iterator(table_iterator, figure, options):
     all_axes = [axes]
 
     # Plot the scatterplot
-    for xs, ys, style in izip(xss, yss, cycle(styles)):
+    for xs, ys, style in zip(xss, yss, cycle(styles)):
         handle = axes.scatter(xs, ys, c=style)
         legend_handles.append(handle)
 
@@ -926,7 +926,7 @@ if __name__ == "__main__":
     try:
         sys.exit(main())
     except Exception as ex:
-        print >>sys.stderr, ex
+        print(ex, file=sys.stderr)
         import traceback
         traceback.print_exc(ex)
         sys.exit(1)

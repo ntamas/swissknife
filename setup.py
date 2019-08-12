@@ -6,9 +6,6 @@ __email__   = "ntamas@gmail.com"
 __copyright__ = "Copyright (c) 2010-2011, Tamas Nepusz"
 __license__ = "GPL"
 
-from ez_setup import use_setuptools
-use_setuptools()
-
 from setuptools import setup, find_packages
 
 params = {}

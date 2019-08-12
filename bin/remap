@@ -29,7 +29,7 @@ class cautiousdict(dict):
     found and shows a warning."""
 
     def __missing__(self, key):
-        print >>sys.stderr, "%r not found in mapping" % key
+        print("%r not found in mapping" % key, file=sys.stderr)
         return key
 
 class lenientdict(dict):
@@ -167,7 +167,7 @@ def remap_file(infile, mapper, options):
                 skip = True
                 break
         if not skip:
-            print options.delimiter.join(new_parts)
+            print(options.delimiter.join(new_parts))
 
 def main():
     """Main entry point of the script."""
@@ -204,5 +204,5 @@ if __name__ == "__main__":
     try:
         sys.exit(main())
     except Exception as ex:
-        print >>sys.stderr, ex
+        print(ex, file=sys.stderr)
         sys.exit(1)

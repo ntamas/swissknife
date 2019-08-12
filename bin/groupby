@@ -5,7 +5,7 @@ Usage: %prog [options] infile
 Groups rows of a tabular data file by the values of a given column.
 """
 
-from __future__ import print_function
+
 
 from swissknife.error import AppError
 from swissknife.utils import open_anything, parse_index_specification, \
@@ -88,7 +88,7 @@ def process_file(infile, options):
             keys_to_values[parts[0]].extend(parts[1:])
 
     # Print the key-value pairs
-    for key, values in keys_to_values.iteritems():
+    for key, values in keys_to_values.items():
         print(join(chain([key], values)))
 
 
