@@ -1,13 +1,14 @@
-
 from datetime import datetime
 from io import IOBase
 
 import re
 
+
 def first(iterable):
     """Returns the first element of the iterable."""
     for item in iterable:
         return item
+
 
 def flatten(*args):
     """Recursively flattens a list containing other lists or
@@ -33,6 +34,7 @@ def flatten(*args):
     if hasattr(args[0], "__iter__") and not isinstance(args[0], str):
         return sum(list(map(flatten, args[0])), [])
     return list(args)
+
 
 class TableWithHeaderIterator(object):
     """Iterates over rows of a stream that contain a table in tabular format,
@@ -92,6 +94,7 @@ def last(iterable):
         result = item
     return result
 
+
 def lenient_float(value, default=None):
     """Like Python's ``float`` but returns the default value when
     the value cannot be converted to a float."""
@@ -100,14 +103,17 @@ def lenient_float(value, default=None):
     except ValueError:
         return default
 
+
 def mask_nans(xs):
     """Replaces None values with NaNs in the given numeric vector and
     then masks all NaNs. Returns a masked NumPy array."""
     from numpy import array, isnan
     from numpy.ma import masked_where
+
     xs = [x if x is not None else NaN for x in xs]
     xs = array(xs)
     return masked_where(isnan(xs), xs)
+
 
 def mean(items):
     """Returns the mean of the given items.
@@ -120,6 +126,7 @@ def mean(items):
     if not items:
         return 0.0
     return sum(items) / len(items)
+
 
 def mean_95ci(items):
     """Returns the mean and the estimate for the width of the 95% confidence
@@ -136,6 +143,7 @@ def mean_95ci(items):
     mean, sd = mean_sd(items)
     return mean, sd / (len(items) ** 0.5) * 3.919927969
 
+
 def mean_err(items):
     """Returns the mean and the estimate for the mean's error for the given items.
     
@@ -150,6 +158,7 @@ def mean_err(items):
     mean, sd = mean_sd(items)
     return mean, sd / (len(items) ** 0.5)
 
+
 def mean_sd(items):
     """Returns the mean and the standard deviation of the given items.
     
@@ -163,8 +172,9 @@ def mean_sd(items):
     if len(items) < 2:
         return m, 0.0
 
-    sqdiff = sum((item-m) ** 2 for item in items)
-    return m, (sqdiff / (len(items)-1)) ** 0.5
+    sqdiff = sum((item - m) ** 2 for item in items)
+    return m, (sqdiff / (len(items) - 1)) ** 0.5
+
 
 def median(items):
     """If `items` has an even length, returns the average of the two
@@ -177,13 +187,15 @@ def median(items):
     mid = n // 2
     items = sorted(items)
     if n % 2 == 0:
-        return (items[mid-1] + items[mid]) / 2
+        return (items[mid - 1] + items[mid]) / 2
     return float(items[mid])
+
 
 def only_numbers(iterable):
     """Returns whether the given iterable contains numbers (or strings that
     can be converted into numbers) only."""
     return not any(lenient_float(item) is None for item in iterable)
+
 
 def open_anything(fname, *args, **kwds):
     """Opens the given file. The file may be given as a file object
@@ -197,20 +209,32 @@ def open_anything(fname, *args, **kwds):
         infile = fname
     elif fname == "-" or fname is None:
         import sys
+
         infile = sys.stdin
-    elif (fname.startswith("http://") or fname.startswith("ftp://") or \
-         fname.startswith("https://")) and not kwds and not args:
+    elif (
+        (
+            fname.startswith("http://")
+            or fname.startswith("ftp://")
+            or fname.startswith("https://")
+        )
+        and not kwds
+        and not args
+    ):
         import urllib.request, urllib.error, urllib.parse
+
         infile = urllib.request.urlopen(fname)
     elif fname[-4:] == ".bz2":
         import bz2
+
         infile = bz2.BZ2File(fname, *args, **kwds)
     elif fname[-3:] == ".gz":
         import gzip
+
         infile = gzip.GzipFile(fname, *args, **kwds)
     else:
         infile = open(fname, *args, **kwds)
     return infile
+
 
 def parse_date(date_string, format="%Y-%m-%d", default=None, ordinal=False):
     """Parses a string and returns a ``datetime`` instance (when `ordinal` is
@@ -227,6 +251,7 @@ def parse_date(date_string, format="%Y-%m-%d", default=None, ordinal=False):
         return result.toordinal()
     return result
 
+
 def parse_index_specification(spec):
     """Parses an index specification used as arguments for the -f
     and -F options."""
@@ -235,18 +260,22 @@ def parse_index_specification(spec):
         part = part.strip()
         if "-" in part:
             lo, hi = list(map(int, part.split("-", 1)))
-            result.extend(range(lo, hi+1))
+            result.extend(range(lo, hi + 1))
         else:
             result.append(int(part))
     return result
+
 
 def parse_range_specification(spec):
     """Parses a range specification used as arguments for some options
     in ``qplot``. Range specifications contain two numbers separated
     by a colon (``:``). Either of the numbers may be replaced by an
     underscore (``_``) or an empty string meaning 'automatic'."""
-    return [None if value == "_" or value == "" else float(value)
-            for value in spec.split(":", 1)]
+    return [
+        None if value == "_" or value == "" else float(value)
+        for value in spec.split(":", 1)
+    ]
+
 
 def parse_size_specification(spec, allow_units=True):
     """Parses a size specification used as arguments for some options
@@ -275,7 +304,7 @@ def parse_size_specification(spec, allow_units=True):
     if len(parts) > 2:
         raise ValueError("Size specification must contain two numbers only")
     if len(parts) == 1:
-        parts = parts*2
+        parts = parts * 2
 
     def parse_part(part):
         part = part.strip().lower()
@@ -291,6 +320,21 @@ def parse_size_specification(spec, allow_units=True):
 
     return tuple(parse_part(part) for part in parts)
 
+
 def sublist(l, idxs):
     return [l[i] for i in idxs]
 
+
+def main_func(func):
+    import sys
+
+    def wrapped(*args, **kwds):
+        try:
+            sys.exit(func(*args, **kwds))
+        except Exception as ex:
+            import traceback
+
+            traceback.print_exc(file=sys.stderr)
+            sys.exit(1)
+
+    return wrapped

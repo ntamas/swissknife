@@ -7,7 +7,7 @@ Remapping of identifiers in a file using a mapping file or mapping expression.
 """
 
 from swissknife.error import AppError
-from swissknife.utils import open_anything, parse_index_specification
+from swissknife.utils import main_func, open_anything, parse_index_specification
 
 import collections
 import optparse
@@ -17,12 +17,16 @@ import sys
 class SkipRowException(Exception):
     """Exception thrown when we should skip a row from the input
     file."""
+
     pass
+
 
 class SkipColumnException(Exception):
     """Exception thrown when we should skip a column from the input
     file."""
+
     pass
+
 
 class cautiousdict(dict):
     """Python dict that returns the key itself if the key is not
@@ -32,12 +36,14 @@ class cautiousdict(dict):
         print("%r not found in mapping" % key, file=sys.stderr)
         return key
 
+
 class lenientdict(dict):
     """Python dict that returns the key itself if the key is not
     found."""
 
     def __missing__(self, key):
         return key
+
 
 class skippingdict(dict):
     """Python dict that throws a specific exception (typically
@@ -54,6 +60,7 @@ class skippingdict(dict):
     def __missing__(self, key):
         raise self.exc
 
+
 class universalset(collections.Set):
     """Set-like object that contains every object (even itself)"""
 
@@ -67,7 +74,7 @@ class universalset(collections.Set):
         raise NotImplementedError("cannot iterate over an universal set")
 
     def __len__(self):
-        return float('inf')
+        return float("inf")
 
 
 class UnknownIDError(AppError):
@@ -80,50 +87,96 @@ class UnknownIDError(AppError):
     def __str__(self):
         return "unknown ID in input file: {0.key}".format(self)
 
+
 def create_option_parser():
     """Creates an `OptionParser` that parses the command line
     options."""
 
     def indexspec_callback(option, opt_str, value, parser):
-        setattr(parser.values, option.dest,
-                parse_index_specification(value))
+        setattr(parser.values, option.dest, parse_index_specification(value))
 
-    parser = optparse.OptionParser(usage=
-            sys.modules[__name__].__doc__.strip())
-    parser.add_option("-d", "--delimiter", metavar="DELIM",
-            dest="delimiter", default="\t",
-            help="use DELIM instad of TAB for field delimiter "
-                 "in the input file")
-    parser.add_option("-D", "--mapping-delimiter", metavar="DELIM",
-            dest="mapping_delimiter", default="\t",
-            help="use DELIM instead of TAB for field delimiter "
-                 "in the mapping file")
-    parser.add_option("-f", "--fields", metavar="LIST",
-            dest="fields", default=[], action="callback",
-            type="str", callback=indexspec_callback,
-            help="remap only these fields",)
-    parser.add_option("-F", "--mapping-fields", metavar="OLD,NEW",
-            dest="mapping_fields", default=[1,2], action="callback",
-            type="str", callback=indexspec_callback,
-            help="use the given columns from the mapping file "
-                 "for the old and new IDs")
-    parser.add_option("-m", "--mapping-file", metavar="FILE",
-            dest="mapping_file", default=None,
-            help="load mappings from the given FILE")
-    parser.add_option("--mapping-expr", metavar="EXPR",
-            dest="mapping_expr", default=None,
-            help="use the given Python expression to calculate the new IDs "
-                 "instead of a mapping file. Use the variable x to refer to "
-                 "the old value in the expression")
-    parser.add_option("-s", "--strict", action="store_true", dest="strict",
-            default=False, help="stop when an ID cannot be remapped")
-    parser.add_option("-W", "--warn", action="store_true", dest="warn",
-            default=False, help="print warning for IDs that cannot be remapped")
-    parser.add_option("--missing", dest="missing_action",
-            default="ignore", choices=("ignore", "warn", "skip", "fail", "empty"),
-            help="specifies what to do when an ID cannot be remapped. "
-                 "Must be one of ignore (default), warn, skip, empty or fail")
+    parser = optparse.OptionParser(usage=sys.modules[__name__].__doc__.strip())
+    parser.add_option(
+        "-d",
+        "--delimiter",
+        metavar="DELIM",
+        dest="delimiter",
+        default="\t",
+        help="use DELIM instad of TAB for field delimiter " "in the input file",
+    )
+    parser.add_option(
+        "-D",
+        "--mapping-delimiter",
+        metavar="DELIM",
+        dest="mapping_delimiter",
+        default="\t",
+        help="use DELIM instead of TAB for field delimiter " "in the mapping file",
+    )
+    parser.add_option(
+        "-f",
+        "--fields",
+        metavar="LIST",
+        dest="fields",
+        default=[],
+        action="callback",
+        type="str",
+        callback=indexspec_callback,
+        help="remap only these fields",
+    )
+    parser.add_option(
+        "-F",
+        "--mapping-fields",
+        metavar="OLD,NEW",
+        dest="mapping_fields",
+        default=[1, 2],
+        action="callback",
+        type="str",
+        callback=indexspec_callback,
+        help="use the given columns from the mapping file " "for the old and new IDs",
+    )
+    parser.add_option(
+        "-m",
+        "--mapping-file",
+        metavar="FILE",
+        dest="mapping_file",
+        default=None,
+        help="load mappings from the given FILE",
+    )
+    parser.add_option(
+        "--mapping-expr",
+        metavar="EXPR",
+        dest="mapping_expr",
+        default=None,
+        help="use the given Python expression to calculate the new IDs "
+        "instead of a mapping file. Use the variable x to refer to "
+        "the old value in the expression",
+    )
+    parser.add_option(
+        "-s",
+        "--strict",
+        action="store_true",
+        dest="strict",
+        default=False,
+        help="stop when an ID cannot be remapped",
+    )
+    parser.add_option(
+        "-W",
+        "--warn",
+        action="store_true",
+        dest="warn",
+        default=False,
+        help="print warning for IDs that cannot be remapped",
+    )
+    parser.add_option(
+        "--missing",
+        dest="missing_action",
+        default="ignore",
+        choices=("ignore", "warn", "skip", "fail", "empty"),
+        help="specifies what to do when an ID cannot be remapped. "
+        "Must be one of ignore (default), warn, skip, empty or fail",
+    )
     return parser
+
 
 def load_mapping(fname, options):
     """Loads a mapping from the given file and returns a dict-like
@@ -147,6 +200,7 @@ def load_mapping(fname, options):
         data[parts[old]] = parts[new]
     return data
 
+
 def remap_file(infile, mapper, options):
     """Remaps the entries in the given file using the given callable mapper."""
     for line in open_anything(infile):
@@ -169,6 +223,8 @@ def remap_file(infile, mapper, options):
         if not skip:
             print(options.delimiter.join(new_parts))
 
+
+@main_func
 def main():
     """Main entry point of the script."""
     parser = create_option_parser()
@@ -192,17 +248,16 @@ def main():
             parser.error("-F must specify exactly two columns")
         mapper = load_mapping(options.mapping_file, options).__getitem__
     elif options.mapping_expr:
+
         def mapper(value):
             return str(eval(options.mapping_expr, {}, dict(x=value)))
+
     else:
         parser.error("either -m or --mapping-expr must be given")
 
     for infile in args:
         remap_file(infile, mapper, options)
 
+
 if __name__ == "__main__":
-    try:
-        sys.exit(main())
-    except Exception as ex:
-        print(ex, file=sys.stderr)
-        sys.exit(1)
+    main()

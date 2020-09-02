@@ -6,52 +6,81 @@ Groups rows of a tabular data file by the values of a given column.
 """
 
 
-
 from swissknife.error import AppError
-from swissknife.utils import open_anything, parse_index_specification, \
-        sublist
+from swissknife.utils import (
+    main_func,
+    open_anything,
+    parse_index_specification,
+    sublist,
+)
 
 from collections import defaultdict
 from itertools import chain
 import optparse
 import sys
 
+
 def create_option_parser():
     """Creates an `OptionParser` that parses the command line
     options."""
 
     def indexspec_callback(option, opt_str, value, parser):
-        setattr(parser.values, option.dest,
-                parse_index_specification(value))
+        setattr(parser.values, option.dest, parse_index_specification(value))
 
-    parser = optparse.OptionParser(usage=
-            sys.modules[__name__].__doc__.strip())
-    parser.add_option("-d", "--delimiter", metavar="DELIM",
-            dest="in_delimiter", default="\t",
-            help="use DELIM for field delimiter in the input file "
-                 "instead of TAB")
-    parser.add_option("-D", "--output-delimiter", metavar="DELIM",
-            dest="out_delimiter", default=None,
-            help="use DELIM for field delimiter in the output file "
-			     "instead of the input delimiter")
-    parser.add_option("-f", "--fields", metavar="LIST",
-            dest="fields", default=None, action="callback",
-            type="str", callback=indexspec_callback,
-            help="use only these columns from the input. The first "
-                 "column is always the column to join on.")
-    parser.add_option("-u", "--unique", action="store_true",
-            dest="unique", default=False,
-            help="keep unique entries only")
-    parser.add_option("--strip", action="store_true", dest="strip", default=False,
-            help="strip leading and trailing whitespace from each line")
+    parser = optparse.OptionParser(usage=sys.modules[__name__].__doc__.strip())
+    parser.add_option(
+        "-d",
+        "--delimiter",
+        metavar="DELIM",
+        dest="in_delimiter",
+        default="\t",
+        help="use DELIM for field delimiter in the input file " "instead of TAB",
+    )
+    parser.add_option(
+        "-D",
+        "--output-delimiter",
+        metavar="DELIM",
+        dest="out_delimiter",
+        default=None,
+        help="use DELIM for field delimiter in the output file "
+        "instead of the input delimiter",
+    )
+    parser.add_option(
+        "-f",
+        "--fields",
+        metavar="LIST",
+        dest="fields",
+        default=None,
+        action="callback",
+        type="str",
+        callback=indexspec_callback,
+        help="use only these columns from the input. The first "
+        "column is always the column to join on.",
+    )
+    parser.add_option(
+        "-u",
+        "--unique",
+        action="store_true",
+        dest="unique",
+        default=False,
+        help="keep unique entries only",
+    )
+    parser.add_option(
+        "--strip",
+        action="store_true",
+        dest="strip",
+        default=False,
+        help="strip leading and trailing whitespace from each line",
+    )
 
     return parser
+
 
 def process_file(infile, options):
     """Processes the given file."""
     # Calculate the column indices we are interested in
     if options.fields:
-        col_idxs = [f-1 for f in options.fields]
+        col_idxs = [f - 1 for f in options.fields]
     else:
         col_idxs = None
 
@@ -92,6 +121,7 @@ def process_file(infile, options):
         print(join(chain([key], values)))
 
 
+@main_func
 def main():
     """Main entry point of the script."""
     parser = create_option_parser()
@@ -99,7 +129,7 @@ def main():
 
     if options.out_delimiter is None:
         options.out_delimiter = options.in_delimiter
-    
+
     if options.fields:
         options.fields = list(options.fields)
 
@@ -109,10 +139,6 @@ def main():
     for arg in args:
         process_file(arg, options)
 
+
 if __name__ == "__main__":
-    try:
-        sys.exit(main())
-    except Exception as ex:
-        print(ex, file=sys.stderr)
-        raise
-        sys.exit(1)
+    main()

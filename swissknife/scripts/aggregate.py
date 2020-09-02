@@ -12,25 +12,47 @@ in the N input files.
 """
 
 
-
 from swissknife.error import AppError
-from swissknife.utils import first, flatten, last, lenient_float, mean, \
-        mean_95ci, mean_err, mean_sd, median, only_numbers, open_anything, \
-        parse_index_specification, sublist
+from swissknife.utils import (
+    first,
+    flatten,
+    last,
+    lenient_float,
+    main_func,
+    mean,
+    mean_95ci,
+    mean_err,
+    mean_sd,
+    median,
+    only_numbers,
+    open_anything,
+    parse_index_specification,
+    sublist,
+)
 
 from itertools import cycle, islice
 import optparse
 import sys
 
 # Known aggregator functions
-functions = dict(max=max, mean=mean, mean_sd=mean_sd, mean_err=mean_err,
-        mean_95ci=mean_95ci, median=median, min=min, sum=sum, first=first,
-        last=last)
+functions = dict(
+    max=max,
+    mean=mean,
+    mean_sd=mean_sd,
+    mean_err=mean_err,
+    mean_95ci=mean_95ci,
+    median=median,
+    min=min,
+    sum=sum,
+    first=first,
+    last=last,
+)
 
 # Add metadata for some of the aggregation functions
 mean_95ci.argout = ("", "95ci")
 mean_err.argout = ("", "err")
-mean_sd.argout  = ("", "sd")
+mean_sd.argout = ("", "sd")
+
 
 def create_option_parser():
     """Creates an `OptionParser` that parses the command line
@@ -42,37 +64,69 @@ def create_option_parser():
         setattr(parser.values, option.dest, functions[value])
 
     def indexspec_callback(option, opt_str, value, parser):
-        setattr(parser.values, option.dest,
-                parse_index_specification(value))
+        setattr(parser.values, option.dest, parse_index_specification(value))
 
-    parser = optparse.OptionParser(usage=
-            sys.modules[__name__].__doc__.strip())
-    parser.add_option("-d", "--delimiter", metavar="DELIM",
-            dest="in_delimiter", default="\t",
-            help="use DELIM instad of TAB for field delimiter "
-                 "in the input file")
-    parser.add_option("-D", "--output-delimiter", metavar="DELIM",
-            dest="out_delimiter", default="\t",
-            help="use DELIM instead of TAB for field delimiter "
-                 "in the output file")
-    parser.add_option("-f", "--fields", metavar="LIST",
-            dest="fields", default=[], action="callback",
-            type="str", callback=indexspec_callback,
-            help="use only these columns from the input. The remaining "
-                 "columns will not be printed.")
-    parser.add_option("-F", "--function", metavar="FUNCTION",
-            dest="function", default=mean, action="callback",
-            type="str", callback=function_callback,
-            help="use the given FUNCTION to aggregate the values. "
-                 "Possible values are: %s." % ", ".join(sorted(functions.keys())))
-    parser.add_option("-m", "--mode", metavar="MODE", dest="mode",
-            choices=("column", "multiple"), default="multiple",
-            help="set the aggregation MODE. Possible values are: column "
-                 "or multiple. See the documentation for more details.")
-    parser.add_option("--strip", action="store_true", dest="strip", default=False,
-            help="strip leading and trailing whitespace from each line")
+    parser = optparse.OptionParser(usage=sys.modules[__name__].__doc__.strip())
+    parser.add_option(
+        "-d",
+        "--delimiter",
+        metavar="DELIM",
+        dest="in_delimiter",
+        default="\t",
+        help="use DELIM instad of TAB for field delimiter " "in the input file",
+    )
+    parser.add_option(
+        "-D",
+        "--output-delimiter",
+        metavar="DELIM",
+        dest="out_delimiter",
+        default="\t",
+        help="use DELIM instead of TAB for field delimiter " "in the output file",
+    )
+    parser.add_option(
+        "-f",
+        "--fields",
+        metavar="LIST",
+        dest="fields",
+        default=[],
+        action="callback",
+        type="str",
+        callback=indexspec_callback,
+        help="use only these columns from the input. The remaining "
+        "columns will not be printed.",
+    )
+    parser.add_option(
+        "-F",
+        "--function",
+        metavar="FUNCTION",
+        dest="function",
+        default=mean,
+        action="callback",
+        type="str",
+        callback=function_callback,
+        help="use the given FUNCTION to aggregate the values. "
+        "Possible values are: %s." % ", ".join(sorted(functions.keys())),
+    )
+    parser.add_option(
+        "-m",
+        "--mode",
+        metavar="MODE",
+        dest="mode",
+        choices=("column", "multiple"),
+        default="multiple",
+        help="set the aggregation MODE. Possible values are: column "
+        "or multiple. See the documentation for more details.",
+    )
+    parser.add_option(
+        "--strip",
+        action="store_true",
+        dest="strip",
+        default=False,
+        help="strip leading and trailing whitespace from each line",
+    )
 
     return parser
+
 
 def process_files_column(infiles, options):
     """Processes the given files in ``column`` mode.
@@ -84,12 +138,13 @@ def process_files_column(infiles, options):
     for idx, filename in enumerate(infiles):
         process_files_column_single(open_anything(filename), options, idx == 0)
 
+
 def process_files_column_single(fp, options, first_file=False):
     """Processes the given stream (open file) in ``column`` mode."""
 
     # Calculate the column indices we are interested in
     if options.fields:
-        col_idxs = [f-1 for f in options.fields]
+        col_idxs = [f - 1 for f in options.fields]
     else:
         col_idxs = None
 
@@ -126,14 +181,14 @@ def process_files_column_single(fp, options, first_file=False):
                         headers = []
                         for header in line:
                             headers.extend(
-                                    "%s_%s" % (header, arg) if arg else header
-                                    for arg in func.argout
+                                "%s_%s" % (header, arg) if arg else header
+                                for arg in func.argout
                             )
                     else:
                         headers = line
                     print(join(headers))
                 continue
-            else: 
+            else:
                 # Yay, finally real data!
                 data_started = True
 
@@ -151,6 +206,7 @@ def process_files_column_single(fp, options, first_file=False):
     # Print the output
     print(join(list(map(str, flatten(func(items) for items in result)))))
 
+
 def process_files_multiple(infiles, options):
     """Processes the given files in ``multiple`` mode.
     
@@ -158,7 +214,7 @@ def process_files_multiple(infiles, options):
     using the aggregation function into row i of the output."""
     # Calculate the column indices we are interested in
     if options.fields:
-        col_idxs = [f-1 for f in options.fields]
+        col_idxs = [f - 1 for f in options.fields]
     else:
         col_idxs = None
 
@@ -190,14 +246,14 @@ def process_files_multiple(infiles, options):
                     headers = []
                     for header in lines[0]:
                         headers.extend(
-                                "%s_%s" % (header, arg) if arg else header
-                                for arg in func.argout
+                            "%s_%s" % (header, arg) if arg else header
+                            for arg in func.argout
                         )
                     print(join(headers))
                 else:
                     print(join(lines[0]))
                 continue
-            else: 
+            else:
                 # Yay, finally real data!
                 data_started = True
 
@@ -215,6 +271,7 @@ def process_files_multiple(infiles, options):
         print(join(row))
 
 
+@main_func
 def main():
     """Main entry point of the script."""
     parser = create_option_parser()
@@ -233,10 +290,6 @@ def main():
     else:
         parser.error("Invalid mode: %s" % options.mode)
 
+
 if __name__ == "__main__":
-    try:
-        sys.exit(main())
-    except Exception as ex:
-        print(ex, file=sys.stderr)
-        raise
-        sys.exit(1)
+    main()

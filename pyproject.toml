@@ -1,0 +1,27 @@
+[tool.poetry]
+name = "swissknife"
+version = "1.0.0"
+description = "A collection of handy utilities for data crunching"
+authors = ["Tamas Nepusz <ntamas@gmail.com>"]
+license = "MIT"
+
+[tool.poetry.dependencies]
+python = "^3.6"
+numpy = "^1.19.1"
+matplotlib = { version = "^3.3.1", optional = true }
+
+[tool.poetry.dev-dependencies]
+black = "^20.8b1"
+
+[tool.poetry.extras]
+plotting = ["matplotlib"]
+
+[tool.poetry.scripts]
+aggregate = "swissknife.scripts.aggregate:main"
+groupby = "swissknife.scripts.groupy:main"
+qplot = "swissknife.scripts.qplot:main"
+remap = "swissknife.scripts.remap:main"
+
+[build-system]
+requires = ["poetry>=0.12"]
+build-backend = "poetry.masonry.api"
